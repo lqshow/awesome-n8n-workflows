@@ -1,0 +1,537 @@
+{
+  "name": "n8n+飞书卡片玩法",
+  "nodes": [
+    {
+      "parameters": {
+        "events": [
+          "any_event"
+        ],
+        "options": {}
+      },
+      "type": "n8n-nodes-feishu-lark.larkTrigger",
+      "typeVersion": 2,
+      "position": [
+        -576,
+        -80
+      ],
+      "id": "0819df00-922a-4a0c-9a3d-a4034c0a2d7c",
+      "name": "Lark Trigger",
+      "credentials": {
+        "larkApi": {
+          "id": "nPtti9NHcY8t9HE6",
+          "name": "n8n+Lark Tenant Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "im.chat.member.user.added_v1",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "4195b69e-01e3-44ba-b32b-1554f096e9d7"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "新人加入"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "0f705406-fb19-45a2-8445-fdf273e1bd74",
+                    "leftValue": "={{ $json.event_type }}",
+                    "rightValue": "im.message.receive_v1",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "消息处理"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "7d7db641-efb3-4377-b072-f254d2af4c7c",
+                    "leftValue": "={{ $json.event_key }}",
+                    "rightValue": "weather_inquiry_request",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "天气查询"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "cb78a41f-8a22-4d58-92ba-3e89d13c2ddb",
+                    "leftValue": "={{ $json.action?.value?.action }}",
+                    "rightValue": "search",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "查询结果"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        -208,
+        -112
+      ],
+      "id": "e04b9fa0-8222-4924-a626-2fc6e014348e",
+      "name": "Router"
+    },
+    {
+      "parameters": {
+        "content": "## Welcome New Members",
+        "height": 224,
+        "width": 672,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        32,
+        -288
+      ],
+      "id": "f594b30b-f890-4f18-9a54-0fcc09ecafeb",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatDeepSeek",
+      "typeVersion": 1,
+      "position": [
+        144,
+        368
+      ],
+      "id": "fa52e740-de6c-40cc-a1c5-aefc8d569b24",
+      "name": "DeepSeek Chat Model",
+      "credentials": {
+        "deepSeekApi": {
+          "id": "uDJ6QiIFt3fDeWPR",
+          "name": "DeepSeek account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "fb341686-e508-4dd5-bd02-658cd723ae63",
+              "name": "GroupWelcomeCard",
+              "value": "AAqhdhCuYfJNw",
+              "type": "string"
+            },
+            {
+              "id": "b3d6d626-3166-4180-8fc3-a8754b39d645",
+              "name": "WeatherInquiry",
+              "value": "AAqhdlVvfoddj",
+              "type": "string"
+            },
+            {
+              "id": "0b3a391f-89a0-4bb7-ba90-29e2d03061ac",
+              "name": "WeatherInformationCard",
+              "value": "AAqh9WOCWknYZ",
+              "type": "string"
+            },
+            {
+              "id": "6ee012a3-ff4f-4a9d-8717-ab40002276d8",
+              "name": "GettingTheWeatherCard",
+              "value": "AAqhxpIbobhRX",
+              "type": "string"
+            },
+            {
+              "id": "3d5532a4-def9-4473-8b38-7172ae92c23b",
+              "name": "=city",
+              "value": "={{ $json.action?.form_value?.city_input || $json.action?.value?.city }}",
+              "type": "string"
+            },
+            {
+              "id": "fe7c5465-a07f-4212-9c73-3bc61d3b7384",
+              "name": "date",
+              "value": "={{$now.toFormat('yyyy-MM-dd')}} (星期{{ ['一','二', '三', '四', '五', '六', '日'][$now.get('weekday') - 1] }})",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -400,
+        -80
+      ],
+      "id": "5c88c3ef-e747-4b2e-9215-54cb5d83303a",
+      "name": "Template Config"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "receive_id_type": "chat_id",
+        "receive_id": {
+          "__rl": true,
+          "value": "={{ $json.chat_id }}",
+          "mode": "id"
+        },
+        "msg_type": "interactive",
+        "content": "={\n  \"type\": \"template\",\n  \"data\": {\n    \"template_id\": \"{{ $('Template Config').item.json.GroupWelcomeCard }}\",\n    \"template_variable\": {\n      \"user_id\": \"{{ $json.users[0].user_id.open_id }}\",\n      \"group_name\": \"{{ $json.name }}\"\n    }\n  }\n} ",
+        "options": {}
+      },
+      "type": "n8n-nodes-feishu-lark.lark",
+      "typeVersion": 1,
+      "position": [
+        320,
+        -224
+      ],
+      "id": "a6cefc19-540f-42ad-b869-522fce76ef18",
+      "name": "Send Welcome Card",
+      "webhookId": "c5ad825b-a6eb-4bc4-90d1-d693394cdbfa",
+      "credentials": {
+        "larkApi": {
+          "id": "nPtti9NHcY8t9HE6",
+          "name": "n8n+Lark Tenant Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "send",
+        "receive_id": {
+          "__rl": true,
+          "value": "={{ $json.operator?.operator_id?.open_id }}",
+          "mode": "id"
+        },
+        "msg_type": "interactive",
+        "content": "={\n  \"type\": \"template\",\n  \"data\": {\n    \"template_id\": \"{{ $('Template Config').item.json.WeatherInquiry }}\"\n  }\n} ",
+        "options": {}
+      },
+      "type": "n8n-nodes-feishu-lark.lark",
+      "typeVersion": 1,
+      "position": [
+        576,
+        -16
+      ],
+      "id": "d0bf1bad-1e70-4874-896c-6d51c255ed03",
+      "name": "Send Weather Form",
+      "webhookId": "c5ad825b-a6eb-4bc4-90d1-d693394cdbfa",
+      "credentials": {
+        "larkApi": {
+          "id": "nPtti9NHcY8t9HE6",
+          "name": "n8n+Lark Tenant Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=请基于以下天气数据生成一份个性化的天气预报：\n\n城市：{{ $('Template Config').item.json.city }}\n查询时间：{{ $now }}\n\n\n请生成一份包含以下内容的中文天气预报：\n1. 🌤️ 今日天气概况\n2. 🌡️ 温度和体感温度\n3. 👔 穿衣建议\n4. 🚗 出行提醒\n5. 💡 生活小贴士\n\n要求：\n- 语言生动友好，适合日常阅读\n- 包含实用的生活建议\n- 使用emoji增加可读性\n- 总长度控制在200-300字\n\n⚠️ 重要：formatted_report字段的换行规则\n- 段落之间用 <br/><br/> 分隔（两个<br/>标签）\n- 禁止使用 \\n 换行符\n- 示例格式：\n  🌤️ 温州今日天气概况：<br/>今天是个晴朗的好天气...<br/><br/>👔 穿衣建议：<br/>建议穿着长袖...<br/><br/>🚗 出行提醒：<br/>今日出行条件良好...",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "你是一位贴心的天气播报员，擅长将枯燥的天气数据转化为温馨实用的生活建议。请用温暖友好的语调，为用户提供个性化的天气预报和生活指导。"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.2,
+      "position": [
+        256,
+        160
+      ],
+      "id": "37583e49-d9a2-4e1e-a011-da1e36edb767",
+      "name": "Weather Agent"
+    },
+    {
+      "parameters": {
+        "endpointUrl": "https://mcp.amap.com/mcp?key=94967cf138f6517292ed0f1c13235fb8",
+        "serverTransport": "httpStreamable",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.mcpClientTool",
+      "typeVersion": 1.1,
+      "position": [
+        320,
+        352
+      ],
+      "id": "7be993cd-2e84-4458-aada-5075314dbbe6",
+      "name": "Weather API"
+    },
+    {
+      "parameters": {
+        "jsonSchemaExample": "{\n  \"weather_summary\": \"天气概况\",\n  \"temperature\": {\n    \"current\": \"当前温度(数字)\",\n    \"high\": \"最高温度(数字)\",\n    \"low\": \"最低温度(数字)\"\n  },\n  \"conditions\": {\n    \"humidity\": \"湿度百分比(数字)\",\n    \"wind_direction\": \"风向\",\n    \"wind_level\": \"风力等级\",\n    \"uv_index\": \"紫外线强度\"\n  },\n  \"forecast\": {\n    \"tomorrow\": \"明天天气\",\n    \"day_after\": \"后天天气\"\n  },\n  \"advice\": {\n    \"clothing\": \"穿衣建议\",\n    \"travel\": \"出行提醒\",\n    \"life\": \"生活小贴士\"\n  },\n  \"formatted_report\": \"完整格式化预报(使用<br/>换行，示例：第一段<br/><br/>第二段<br/><br/>第三段)\"\n}",
+        "autoFix": true
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        432,
+        352
+      ],
+      "id": "21dd3106-9003-483f-9f60-e39f61ca03f7",
+      "name": "Parse Weather Data"
+    },
+    {
+      "parameters": {
+        "content": "## Weather Query Agent \nHandles weather inquiries and sends formatted reports",
+        "height": 544,
+        "width": 672
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        32,
+        -48
+      ],
+      "id": "95ea16e5-e8bb-4a25-b9c3-60b0482dca53",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "updateMessageCard",
+        "message_id": "={{ $('Lark Trigger').item.json.context.open_message_id }}",
+        "content": "={\n  \"type\": \"template\",\n  \"data\": {\n    \"template_id\": \"{{ $('Template Config').item.json.GettingTheWeatherCard }}\",\n    \"template_variable\": {\n      \"city\": \"{{ $('Template Config').item.json.city }}\"\n    }\n  }\n} "
+      },
+      "type": "n8n-nodes-feishu-lark.lark",
+      "typeVersion": 1,
+      "position": [
+        80,
+        160
+      ],
+      "id": "aede1f90-f7ca-44c8-962e-32fdb7058816",
+      "name": "Getting the weather",
+      "webhookId": "c5ad825b-a6eb-4bc4-90d1-d693394cdbfa",
+      "credentials": {
+        "larkApi": {
+          "id": "nPtti9NHcY8t9HE6",
+          "name": "n8n+Lark Tenant Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "message",
+        "operation": "updateMessageCard",
+        "message_id": "={{ $('Lark Trigger').item.json.context.open_message_id }}",
+        "content": "={\n  \"type\": \"template\",\n  \"data\": {\n    \"template_id\": \"{{ $('Template Config').item.json.WeatherInformationCard }}\",\n    \"template_variable\": {\n      \"date\": \"{{ $('Template Config').item.json.date }}\",\n      \"city\": \"{{ $('Template Config').item.json.city }}\",\n      \"formatted_report\": \"{{ $json.output.formatted_report }}\",\n      \"tomorrow\": \"{{ $json.output.forecast.tomorrow }}\",\n      \"day_after\": \"{{ $json.output.forecast.day_after }}\",\n      \"humidity\": \"{{ $json.output.conditions.humidity }}\",\n      \"wind_direction\": \"{{ $json.output.conditions.wind_direction }}\",\n      \"wind_level\": \"{{ $json.output.conditions.wind_level }}\",\n      \"uv_index\": \"{{ $json.output.conditions.uv_index }}\",\n      \"temperature_low\": \"{{ $json.output.temperature.low }}\",\n      \"temperature_high\": \"{{ $json.output.temperature.high }}\"\n    }\n  }\n} "
+      },
+      "type": "n8n-nodes-feishu-lark.lark",
+      "typeVersion": 1,
+      "position": [
+        576,
+        160
+      ],
+      "id": "102dbbfb-2336-4309-b2e2-3a83ae3bdfcc",
+      "name": "Send Weather Report",
+      "webhookId": "c5ad825b-a6eb-4bc4-90d1-d693394cdbfa",
+      "credentials": {
+        "larkApi": {
+          "id": "nPtti9NHcY8t9HE6",
+          "name": "n8n+Lark Tenant Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "# 飞书卡片 + n8n 零代码自动化实战\n\n## 📋 **基本信息**\n- 工作流名称：飞书卡片 + n8n 零代码自动化实战\n- 版本：v1.0.0\n- 创建者：林月半子\n- 微信：cloud-native-101\n- 公众号：林月半子的AI笔记\n\n---\n\n\n## 🎯 **工作流概述**\n\n这是一个基于飞书开放平台和 n8n 的自动化解决方案,包含两个经典场景:\n\n1. **入群欢迎系统** - 单向通知场景\n2. **天气查询助手** - 双向交互场景\n\n\n通过飞书卡片搭建工具和 n8n 的配合,实现零代码(或少量代码)快速搭建交互式应用。\n\n",
+        "height": 784,
+        "width": 928,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -912,
+        -288
+      ],
+      "id": "1540f6db-e3dd-4506-8662-55ad37aefe74",
+      "name": "Sticky Note2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Lark Trigger": {
+      "main": [
+        [
+          {
+            "node": "Template Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Router": {
+      "main": [
+        [
+          {
+            "node": "Send Welcome Card",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [],
+        [
+          {
+            "node": "Send Weather Form",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Getting the weather",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "DeepSeek Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Weather Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          },
+          {
+            "node": "Parse Weather Data",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Template Config": {
+      "main": [
+        [
+          {
+            "node": "Router",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weather Agent": {
+      "main": [
+        [
+          {
+            "node": "Send Weather Report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Weather API": {
+      "ai_tool": [
+        [
+          {
+            "node": "Weather Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Weather Data": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Weather Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Getting the weather": {
+      "main": [
+        [
+          {
+            "node": "Weather Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "441596cd-46a2-4215-8df0-fe178d73ea4b",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a152539bc323133bde80781a1dc51fefe2ad2e9f6579ca96b98f3bb66ae5bb00"
+  },
+  "id": "GMz2ejIRM3UskQaB",
+  "tags": []
+}
