@@ -1,0 +1,1988 @@
+{
+  "name": "PixelSensei(ZH)",
+  "nodes": [
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $('User Input').item.json.topic }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "={{ $('Extract Character Config').item.json.planningPrompt }}\n\nDo NOT refuse the topic. Your job is to explain it regardless of the domain.\n\n**Language Rule**: Detect the language of the user's input and respond in the SAME language. If the user writes in Chinese, respond in Chinese. If the user writes in English, respond in English."
+        }
+      },
+      "id": "7f222b40-90e1-4162-bc87-6eba458bfe69",
+      "name": "Planning Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        -43280,
+        -21408
+      ],
+      "retryOnFail": true,
+      "maxTries": 5
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"topic\": {\n      \"type\": \"string\",\n      \"description\": \"The technical concept to explain\"\n    },\n    \"complexity\": {\n      \"type\": \"string\",\n      \"description\": \"Complexity level: simple, medium, complex, or systematic\"\n    },\n    \"totalPages\": {\n      \"type\": \"number\",\n      \"description\": \"Total number of comic pages to generate\"\n    },\n    \"artStyle\": {\n      \"type\": \"string\",\n      \"description\": \"Art style: manga, minimal, cyberpunk, or sketch\"\n    },\n    \"coreAnalogy\": {\n      \"type\": \"string\",\n      \"description\": \"Main analogy or metaphor to explain the concept\"\n    },\n    \"pages\": {\n      \"type\": \"array\",\n      \"description\": \"Array of page objects with flexible dialogue and technical content structure\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"pageNumber\": {\n            \"type\": \"number\",\n            \"description\": \"Page number in sequence\"\n          },\n          \"title\": {\n            \"type\": \"string\",\n            \"description\": \"Page title\"\n          },\n          \"scene\": {\n            \"type\": \"string\",\n            \"description\": \"Scene description and setting\"\n          },\n          \"dialogue\": {\n            \"type\": \"array\",\n            \"description\": \"Array of dialogue objects with character and text\",\n            \"items\": {\n              \"type\": \"object\",\n              \"properties\": {\n                \"character\": {\n                  \"type\": \"string\",\n                  \"description\": \"Character name (e.g., Rick Sanchez, Morty Smith)\"\n                },\n                \"text\": {\n                  \"type\": \"string\",\n                  \"description\": \"Dialogue text for this character\"\n                }\n              },\n              \"required\": [\"character\", \"text\"]\n            }\n          },\n          \"visualElements\": {\n            \"type\": \"string\",\n            \"description\": \"Visual elements and actions in the panel\"\n          },\n          \"technicalSection\": {\n            \"type\": \"object\",\n            \"description\": \"Technical content section with title and detailed content\",\n            \"properties\": {\n              \"title\": {\n                \"type\": \"string\",\n                \"description\": \"Title of the technical section\"\n              },\n              \"content\": {\n                \"type\": \"string\",\n                \"description\": \"Detailed technical explanation or diagram description\"\n              }\n            },\n            \"required\": [\"title\", \"content\"]\n          },\n          \"learningPoint\": {\n            \"type\": \"object\",\n            \"description\": \"Key learning takeaway from this page\",\n            \"properties\": {\n              \"title\": {\n                \"type\": \"string\",\n                \"description\": \"Title of the learning point\"\n              },\n              \"content\": {\n                \"type\": \"string\",\n                \"description\": \"Detailed learning point explanation\"\n              }\n            },\n            \"required\": [\"title\", \"content\"]\n          }\n        },\n        \"required\": [\"pageNumber\", \"title\", \"scene\", \"dialogue\", \"visualElements\", \"learningPoint\"]\n      }\n    }\n  },\n  \"required\": [\"topic\", \"complexity\", \"totalPages\", \"artStyle\", \"coreAnalogy\", \"pages\"]\n}",
+        "autoFix": true
+      },
+      "id": "71ec8bb8-4df4-4869-99f0-01c3e606ac1f",
+      "name": "Comic Plan Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -43104,
+        -21136
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "id-1",
+              "name": "topic",
+              "value": "={{ $json.output.topic }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "complexity",
+              "value": "={{ $json.output.complexity }}",
+              "type": "string"
+            },
+            {
+              "id": "id-3",
+              "name": "totalPages",
+              "value": "={{ $json.output.totalPages }}",
+              "type": "number"
+            },
+            {
+              "id": "id-4",
+              "name": "artStyle",
+              "value": "={{ $json.output.artStyle }}",
+              "type": "string"
+            },
+            {
+              "id": "id-5",
+              "name": "coreAnalogy",
+              "value": "={{ $json.output.coreAnalogy }}",
+              "type": "string"
+            },
+            {
+              "id": "id-6",
+              "name": "pages",
+              "value": "={{ JSON.stringify($json.output.pages) }}",
+              "type": "array"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "id": "d320f205-55d0-4f42-8c0e-c6a724c70d6e",
+      "name": "Extract Plan Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -42912,
+        -21408
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const planData = $input.item.json;\n// 获取实际的页面数组\nconst pages = Array.isArray(planData.pages) ? planData.pages : [];\n\n// ⭐ 关键点：直接计算实际生成的页数（比如 12）\n// 不要完全信任 planData.totalPages，以数组实际长度为准\nconst actualTotalCount = pages.length;\n\nreturn {\n  output: pages\n    .filter(page => page && typeof page === 'object' && !Array.isArray(page))\n    .map(page => ({\n      json: {\n        ...page,\n        // 把父级的通用属性带下来\n        topic: planData.topic,\n        artStyle: planData.artStyle,\n        \n        // ⭐ 注入总页数！这样每一页都知道总数是多少\n        totalPages: actualTotalCount \n      }\n    }))\n};"
+      },
+      "id": "b4eac772-9642-46a1-bd93-47a461fa6dfa",
+      "name": "Split Pages into Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -42688,
+        -21408
+      ]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "output",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        -42416,
+        -21408
+      ],
+      "id": "63779125-2a45-4213-a4cc-6cd05e536407",
+      "name": "Split Out"
+    },
+    {
+      "parameters": {
+        "content": "#### 配置 Gemini Header Auth 👇",
+        "height": 80,
+        "width": 246,
+        "color": 3
+      },
+      "id": "23666ad9-d342-4b92-8f4d-4c754b2b7fc0",
+      "name": "Sticky Note12",
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -42240,
+        12480
+      ],
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "jsCode": "// HTML Assembler - Combine all pages into main HTML template\nconst inputItems = $input.all();\nconst firstItem = inputItems[0];\nconst allPages = firstItem.json.data || [];\n\n// Add check for empty pages data\nif (allPages.length === 0) {\n  console.error('HTML Assembler - No pages data found');\n  return [{\n    json: {\n      error: 'No pages data available'\n    }\n  }];\n}\n\nconsole.log('HTML Assembler - Data structure:', {\n  totalInputItems: inputItems.length,\n  hasDataArray: !!firstItem.json.data,\n  dataArrayLength: firstItem.json.data?.length\n});\n\n// Debug: Log first page data\nconsole.log('HTML Assembler - First page data:', JSON.stringify({\n  mentorName: allPages[0]?.mentorName,\n  learnerName: allPages[0]?.learnerName,\n  mainTitle: allPages[0]?.mainTitle,\n  hasDialogueHTML: !!allPages[0]?.dialogueHTML,\n  hasPageHTML: !!allPages[0]?.pageHTML\n}));\n\n// Get comic metadata from first page\nconst comicData = allPages[0];\nconsole.log(\"#####\")\nconsole.log(allPages)\nconsole.log(\"#####\")\n// Collect all page HTML - Fixed to properly extract pageHTML from data array\nconst allPagesHTML = allPages\n  .map(page => {\n    const pageObj = page;\n    return pageObj.pageHTML || '';\n  })\n  .filter(html => html.trim() !== '')\n  .join('\\n\\n');\n\n// Read main HTML template\nconst mainTemplate = `<!DOCTYPE html>\n<html lang=\"en\">\n<head>\n    <meta charset=\"UTF-8\">\n    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1.0\">\n    <title>{{TITLE}} - Tech Comic</title>\n        <style>\n        * {\n            margin: 0;\n            padding: 0;\n            box-sizing: border-box;\n        }\n\n        body {\n            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\n            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);\n            color: #e2e8f0;\n            line-height: 1.6;\n            min-height: 100vh;\n            padding: 20px;\n        }\n\n        .container {\n            max-width: 1200px;\n            margin: 0 auto;\n        }\n\n        header {\n            text-align: center;\n            margin-bottom: 40px;\n            padding: 30px;\n            background: rgba(30, 41, 59, 0.8);\n            border-radius: 20px;\n            border: 1px solid rgba(148, 163, 184, 0.2);\n            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);\n        }\n\n        h1 {\n            font-size: 2.8rem;\n            background: linear-gradient(90deg, #60a5fa, #a78bfa);\n            -webkit-background-clip: text;\n            -webkit-text-fill-color: transparent;\n            margin-bottom: 15px;\n            text-shadow: 0 2px 10px rgba(96, 165, 250, 0.3);\n        }\n\n        .subtitle {\n            font-size: 1.2rem;\n            color: #94a3b8;\n            margin-bottom: 20px;\n        }\n\n        .stats {\n            display: flex;\n            justify-content: center;\n            gap: 30px;\n            margin-top: 20px;\n            flex-wrap: wrap;\n        }\n\n        .stat-item {\n            background: rgba(51, 65, 85, 0.6);\n            padding: 15px 25px;\n            border-radius: 12px;\n            border: 1px solid rgba(148, 163, 184, 0.2);\n        }\n\n        .stat-label {\n            font-size: 0.9rem;\n            color: #94a3b8;\n            margin-bottom: 5px;\n        }\n\n        .stat-value {\n            font-size: 1.4rem;\n            font-weight: bold;\n            color: #60a5fa;\n        }\n\n        .intro-box {\n            background: rgba(96, 165, 250, 0.1);\n            border: 1px solid rgba(96, 165, 250, 0.3);\n            border-radius: 15px;\n            padding: 25px;\n            margin-bottom: 40px;\n            text-align: center;\n        }\n\n        .intro-box h3 {\n            color: #60a5fa;\n            margin-bottom: 10px;\n            font-size: 1.4em;\n        }\n\n        .intro-box p {\n            color: #94a3b8;\n            font-size: 1.1em;\n            line-height: 1.6;\n        }\n\n        .page {\n            margin: 40px 0;\n            padding: 30px;\n            border-radius: 15px;\n            background: rgba(255,255,255,0.02);\n            border-left: 5px solid #60a5fa;\n            box-shadow: 0 5px 20px rgba(0,0,0,0.2);\n            transition: all 0.3s ease;\n        }\n\n        .page:hover {\n            transform: translateX(5px);\n            box-shadow: 0 8px 30px rgba(96, 165, 250, 0.2);\n        }\n\n        .page:nth-child(even) {\n            border-left-color: #a78bfa;\n        }\n\n        .page-header {\n            display: flex;\n            align-items: center;\n            gap: 20px;\n            margin-bottom: 25px;\n            justify-content: space-between;\n        }\n\n        .page-number {\n            background: linear-gradient(45deg, #60a5fa, #3b82f6);\n            color: white;\n            width: 50px;\n            height: 50px;\n            border-radius: 50%;\n            display: flex;\n            align-items: center;\n            justify-content: center;\n            font-size: 1.4em;\n            font-weight: bold;\n            box-shadow: 0 4px 15px rgba(96, 165, 250, 0.4);\n            flex-shrink: 0;\n        }\n\n        .page:nth-child(even) .page-number {\n            background: linear-gradient(45deg, #a78bfa, #9333ea);\n            box-shadow: 0 4px 15px rgba(167, 139, 250, 0.4);\n        }\n\n        .page-title {\n            color: #60a5fa;\n            font-size: 1.6em;\n            font-weight: bold;\n        }\n\n        .page:nth-child(even) .page-title {\n            color: #a78bfa;\n        }\n\n        .page-content {\n            display: flex;\n            flex-wrap: wrap;\n            gap: 30px;\n            align-items: flex-start;\n        }\n\n        .page-image {\n            flex: 1;\n            min-width: 300px;\n            border-radius: 12px;\n            overflow: hidden;\n            box-shadow: 0 10px 30px rgba(0,0,0,0.3);\n            border: 2px solid rgba(255,255,255,0.1);\n            transition: all 0.3s ease;\n        }\n\n        .page-image:hover {\n            transform: scale(1.02);\n            box-shadow: 0 15px 40px rgba(96, 165, 250, 0.3);\n        }\n\n        .page-image img {\n            width: 100%;\n            height: auto;\n            display: block;\n        }\n\n        .page-image-container {\n            flex: 1;\n            min-width: 310px;\n            padding: 20px;\n            display: flex;\n            align-items: center;\n            justify-content: center;\n            background: rgba(15, 23, 42, 0.7);\n        }\n\n        .page-info {\n            flex: 1;\n            padding: 20px;\n            background: rgba(15, 23, 42, 0.9);\n        }\n\n        .page-desc {\n            font-size: 1rem;\n            color: #94a3b8;\n            margin-bottom: 20px;\n            line-height: 1.5;\n        }\n\n        .dialogue-section {\n            margin-bottom: 25px;\n        }\n\n        .section-title {\n            font-size: 1rem;\n            color: #60a5fa;\n            margin-bottom: 15px;\n            text-transform: uppercase;\n            letter-spacing: 1px;\n        }\n\n        .dialogue-item {\n            margin-bottom: 15px;\n            padding: 12px 15px;\n            background: rgba(51, 65, 85, 0.6);\n            border-radius: 10px;\n            border-left: 4px solid;\n        }\n\n        /* Rick - Blue theme */\n        .dialogue-item.role-learner {\n            border-left-color: #60a5fa;\n        }\n\n        /* Morty - Yellow theme */\n        .dialogue-item.role-mentor {\n            border-left-color: #fbbf24;\n        }\n\n        .character {\n            font-weight: bold;\n            margin-bottom: 5px;\n            display: flex;\n            align-items: center;\n            gap: 8px;\n        }\n\n        .character.role-learner {\n            color: #60a5fa;\n        }\n\n        .character.role-mentor {\n            color: #fbbf24;\n        }\n\n        .character-emoji {\n            font-size: 1.2rem;\n        }\n\n        .dialogue-text {\n            color: #e2e8f0;\n            font-size: 0.95rem;\n        }\n\n        .tech-section {\n            margin-top: 20px;\n            margin-bottom: 20px;\n        }\n\n        .tech-box {\n            background: rgba(51, 65, 85, 0.6);\n            border-radius: 10px;\n            padding: 15px;\n        }\n\n        .tech-label {\n            font-size: 0.9rem;\n            color: #94a3b8;\n            margin-bottom: 8px;\n            text-transform: uppercase;\n            letter-spacing: 1px;\n        }\n\n        .tech-content {\n            color: #a78bfa;\n            font-family: 'Courier New', monospace;\n            font-size: 0.9rem;\n            background: rgba(15, 23, 42, 0.6);\n            padding: 10px;\n            border-radius: 8px;\n            border: 1px solid rgba(167, 139, 250, 0.3);\n        }\n\n        .learning-section {\n            margin-top: 20px;\n            background: rgba(34, 197, 94, 0.1);\n            border-left: 4px solid #22c55e;\n            border-radius: 10px;\n            padding: 15px;\n        }\n\n        .learning-content {\n            color: #e2e8f0;\n            font-size: 0.95rem;\n            line-height: 1.6;\n            margin-top: 10px;\n        }\n\n        footer {\n            text-align: center;\n            margin-top: 50px;\n            padding-top: 30px;\n            border-top: 1px solid rgba(255,255,255,0.1);\n            color: #666;\n        }\n\n        .footer-icons {\n            display: flex;\n            justify-content: center;\n            gap: 15px;\n            margin-bottom: 15px;\n            font-size: 1.5em;\n        }\n        .footer-honest {\n          background: linear-gradient(180deg, rgba(15, 23, 42, 0.8) 0%, rgba(2, 6, 23, 0.95) 100%);\n          border-top: 1px solid rgba(148, 163, 184, 0.15);\n          padding: 50px 20px 30px;\n          margin-top: 80px;\n        }\n        \n        .footer-container {\n          max-width: 900px;\n          margin: 0 auto;\n          display: flex;\n          flex-direction: column;\n          gap: 35px;\n        }\n        \n        /* 品牌区域 */\n        .footer-brand {\n          text-align: center;\n        }\n        \n        .brand-header {\n          display: inline-flex;\n          align-items: center;\n          gap: 12px;\n          margin-bottom: 12px;\n        }\n        \n        .brand-icon {\n          font-size: 2rem;\n        }\n        \n        .brand-name {\n          font-size: 1.4rem;\n          font-weight: 600;\n          background: linear-gradient(90deg, #60a5fa, #a78bfa);\n          -webkit-background-clip: text;\n          -webkit-text-fill-color: transparent;\n        }\n        \n        .brand-tagline {\n          color: #94a3b8;\n          font-size: 1rem;\n          line-height: 1.6;\n          max-width: 650px;\n          margin: 0 auto;\n        }\n        \n        /* CTA 按钮区域 */\n        .footer-actions {\n          display: flex;\n          justify-content: center;\n          gap: 15px;\n          flex-wrap: wrap;\n        }\n        \n        .btn-primary {\n          display: inline-flex;\n          align-items: center;\n          gap: 8px;\n          background: linear-gradient(135deg, #60a5fa, #3b82f6);\n          color: white;\n          padding: 14px 28px;\n          border-radius: 10px;\n          text-decoration: none;\n          font-weight: 600;\n          font-size: 0.95rem;\n          transition: all 0.3s ease;\n          box-shadow: 0 4px 15px rgba(96, 165, 250, 0.3);\n        }\n        \n        .btn-primary:hover {\n          transform: translateY(-2px);\n          box-shadow: 0 6px 20px rgba(96, 165, 250, 0.4);\n        }\n        \n        .btn-secondary {\n          display: inline-flex;\n          align-items: center;\n          color: #94a3b8;\n          padding: 14px 28px;\n          border: 1px solid rgba(148, 163, 184, 0.3);\n          border-radius: 10px;\n          text-decoration: none;\n          font-weight: 500;\n          font-size: 0.95rem;\n          transition: all 0.3s ease;\n        }\n        \n        .btn-secondary:hover {\n          border-color: #60a5fa;\n          color: #60a5fa;\n          background: rgba(96, 165, 250, 0.05);\n        }\n        \n        /* 法律信息区域 */\n        .footer-legal {\n          text-align: center;\n          padding-top: 30px;\n          border-top: 1px solid rgba(148, 163, 184, 0.1);\n        }\n        \n        .legal-text {\n          display: flex;\n          flex-direction: column;\n          gap: 10px;\n        }\n        \n        .legal-text p {\n          color: #64748b;\n          font-size: 0.875rem;\n        }\n        \n        .legal-text a {\n          color: #60a5fa;\n          text-decoration: none;\n          transition: color 0.2s;\n        }\n        \n        .legal-text a:hover {\n          color: #93c5fd;\n          text-decoration: underline;\n        }\n        \n        .disclaimer {\n          font-size: 0.8rem !important;\n          color: #475569 !important;\n          font-style: italic;\n        }\n        \n        @media (max-width: 640px) {\n          .footer-actions {\n            flex-direction: column;\n            width: 100%;\n          }\n          \n          .btn-primary,\n          .btn-secondary {\n            width: 100%;\n            justify-content: center;\n          }\n          \n          .brand-tagline {\n            font-size: 0.9rem;\n          }\n        }\n        @media (max-width: 768px) {\n            .page-content {\n                flex-direction: column;\n            }\n\n            .page-image, .page-text {\n                min-width: 100%;\n            }\n\n            h1 {\n                font-size: 2em;\n            }\n\n            .page-title {\n                font-size: 1.3em;\n            }\n\n            .meta-info {\n                flex-direction: column;\n                align-items: center;\n            }\n        }\n    </style>\n\n    <!-- 主题切换器样式 -->\n    <style>\n        /* 主题切换器样式 */\n        .theme-switcher {\n          position: fixed;\n          top: 20px;\n          right: 20px;\n          background: rgba(30, 41, 59, 0.95);\n          border-radius: 15px;\n          padding: 10px;\n          box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);\n          backdrop-filter: blur(10px);\n          z-index: 1000;\n          border: 1px solid rgba(148, 163, 184, 0.2);\n        }\n\n        .switcher-label {\n          color: #94a3b8;\n          font-size: 0.85rem;\n          margin-bottom: 10px;\n          text-align: center;\n          font-weight: 600;\n          text-transform: uppercase;\n          letter-spacing: 1px;\n        }\n\n        .theme-options {\n          display: flex;\n          flex-direction: column;\n          gap: 8px;\n        }\n\n        .theme-btn {\n          display: flex;\n          align-items: center;\n          gap: 10px;\n          padding: 10px 10px;\n          background: rgba(51, 65, 85, 0.6);\n          border: 2px solid transparent;\n          border-radius: 10px;\n          cursor: pointer;\n          transition: all 0.3s ease;\n          min-width: 140px;\n        }\n\n        .theme-btn:hover {\n          background: rgba(51, 65, 85, 0.9);\n          border-color: rgba(96, 165, 250, 0.5);\n          transform: translateX(-3px);\n        }\n\n        .theme-btn.active {\n          border-color: #60a5fa;\n          background: rgba(96, 165, 250, 0.15);\n          box-shadow: 0 0 15px rgba(96, 165, 250, 0.3);\n        }\n\n        .theme-preview {\n          width: 30px;\n          height: 30px;\n          border-radius: 8px;\n          display: block;\n          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);\n        }\n\n        .theme-name {\n          color: #e2e8f0;\n          font-size: 0.9rem;\n          font-weight: 500;\n        }\n\n        /* 移动端优化 */\n        @media (max-width: 768px) {\n          .theme-switcher {\n            top: auto;\n            bottom: 20px;\n            right: 20px;\n            left: 20px;\n          }\n          \n          .theme-options {\n            flex-direction: row;\n            flex-wrap: wrap;\n          }\n          \n          .theme-btn {\n            flex: 1;\n            min-width: auto;\n          }\n          \n          .theme-name {\n            display: none;\n          }\n        }\n    </style>\n    \n    <!-- 动态主题容器 -->\n    <style id=\"dynamic-theme\"></style>\n\n    <script>\n    // 主题切换逻辑\n    const themeStyles = {\n      default: \\`/* 当前的默认 CSS */\\`,\n      cyberpunk: \\`{{CYBERPUNK_CSS}}\\`,\n      minimal: \\`{{MINIMAL_CSS}}\\`,\n    };\n\n    // 等待 DOM 加载完成\n    document.addEventListener('DOMContentLoaded', function() {\n      // 初始化主题\n      const savedTheme = localStorage.getItem('preferredTheme') || 'default';\n      applyTheme(savedTheme);\n      \n      // 更新按钮状态\n      updateActiveButton(savedTheme);\n      \n      // 绑定按钮事件\n      document.querySelectorAll('.theme-btn').forEach(btn => {\n        btn.addEventListener('click', function() {\n          const theme = this.dataset.theme;\n          applyTheme(theme);\n          updateActiveButton(theme);\n        });\n      });\n    });\n\n    // 初始化\n    let currentTheme = localStorage.getItem('preferredTheme') || 'default';\n    applyTheme(currentTheme);\n\n    // 绑定按钮事件\n    document.querySelectorAll('.theme-btn').forEach(btn => {\n      btn.addEventListener('click', () => {\n        const theme = btn.dataset.theme;\n        applyTheme(theme);\n        \n        // 更新按钮状态\n        document.querySelectorAll('.theme-btn').forEach(b => b.classList.remove('active'));\n        btn.classList.add('active');\n      });\n    });\n\n    // 应用主题\n    function applyTheme(themeName) {\n      const styleTag = document.getElementById('dynamic-theme') || createStyleTag();\n      styleTag.textContent = themeStyles[themeName];\n      localStorage.setItem('preferredTheme', themeName);\n      \n      // 添加切换动画 - 修复后的版本\n      if (document.body) {\n        document.body.style.transition = 'opacity 0.15s ease';\n        document.body.style.opacity = '0.95';\n        setTimeout(() => {\n          document.body.style.opacity = '1';\n        }, 150);\n      }\n    }\n\n    function createStyleTag() {\n      const style = document.createElement('style');\n      style.id = 'dynamic-theme';\n      document.head.appendChild(style);\n      return style;\n    }\n    // 更新按钮激活状态\n    function updateActiveButton(themeName) {\n      document.querySelectorAll('.theme-btn').forEach(btn => {\n        if (btn.dataset.theme === themeName) {\n          btn.classList.add('active');\n        } else {\n          btn.classList.remove('active');\n        }\n      });\n    }\n    </script>\n</head>\n<body>\n    <div class=\"container\">\n        <header>\n            <h1>{{TITLE}}</h1>\n            <p class=\"subtitle\">{{SUBTITLE}}</p>\n            <div class=\"stats\">\n                <div class=\"stat-item\">\n                    <div class=\"stat-label\">Characters</div>\n                    <div class=\"stat-value\">{{CHARACTERS}}</div>\n                </div>\n                <div class=\"stat-item\">\n                    <div class=\"stat-label\">Art Style</div>\n                    <div class=\"stat-value\">{{STYLE}}</div>\n                </div>\n                <div class=\"stat-item\">\n                    <div class=\"stat-label\">Complexity</div>\n                    <div class=\"stat-value\">{{COMPLEXITY}}</div>\n                </div>\n                <div class=\"stat-item\">\n                    <div class=\"stat-label\">Chapters</div>\n                    <div class=\"stat-value\">{{PAGE_COUNT}} Pages</div>\n                </div>\n            </div>\n        </header>\n\n        <div class=\"theme-switcher\">\n          <div class=\"switcher-label\">🎨 Theme</div>\n          <div class=\"theme-options\">\n            <button class=\"theme-btn active\" data-theme=\"default\">\n              <span class=\"theme-preview\" style=\"background: linear-gradient(45deg, #60a5fa, #a78bfa)\"></span>\n              <span class=\"theme-name\">Default</span>\n            </button>\n            <button class=\"theme-btn\" data-theme=\"cyberpunk\">\n              <span class=\"theme-preview\" style=\"background: linear-gradient(45deg, #00f0ff, #ff006e)\"></span>\n              <span class=\"theme-name\">Cyberpunk</span>\n            </button>\n            <button class=\"theme-btn\" data-theme=\"minimal\">\n              <span class=\"theme-preview\" style=\"background: linear-gradient(45deg, #3b82f6, #8b5cf6)\"></span>\n              <span class=\"theme-name\">Minimal</span>\n            </button>\n          </div>\n        </div>\n        \n        <div class=\"intro-box\">\n            <h3>📖 {{ANALOGY_TITLE}}</h3>\n            <p>{{ANALOGY_DESC}}</p>\n        </div>\n\n        <!-- ===== Page Content Area ===== -->\n        {{PAGES}}\n        <!-- ===== Page Content End ===== -->\n\n        <footer class=\"footer-honest\">\n          <div class=\"footer-container\">\n            <!-- 品牌 + 价值主张 -->\n            <div class=\"footer-brand\">\n              <div class=\"brand-header\">\n                <span class=\"brand-icon\">🎨</span>\n                <span class=\"brand-name\">Tech Comic Generator</span>\n              </div>\n              <p class=\"brand-tagline\">\n                AI-powered educational comics. Learn complex tech concepts through visual storytelling.\n              </p>\n            </div>\n            \n            <!-- 核心 CTA -->\n            <div class=\"footer-actions\">\n              <a href=\"https://mulerun.com/@LunarAITalk/pixelsensei\" class=\"btn-primary\">\n                <span>Create Your Own Comic</span>\n                <span class=\"btn-icon\">→</span>\n              </a>\n            </div>\n            \n            <!-- 法律 + 归属 -->\n            <div class=\"footer-legal\">\n              <div class=\"legal-text\">\n                <p>\n                  © 2025 Tech Comic Generator • \n                </p>\n                <p class=\"disclaimer\">\n                  ⚡ Generated with AI • Characters are inspired by popular franchises for educational purposes\n                </p>\n              </div>\n            </div>\n          </div>\n        </footer>\n    </div>\n</body>\n</html>`;\n\n// Generate dynamic subtitle\nconst mentorName = allPages[0]?.mentorName || 'Mentor';\nconst learnerName = allPages[0]?.learnerName || 'Learner';\nconst topicName = allPages[0]?.mainTitle || allPages[0]?.topic || 'Tech Topic';\n\n// Generate subtitle, e.g., \"Rick and Morty teach you n8n\"\nconst subtitle = `${mentorName} and ${learnerName} teach you ${topicName}`;\n\n// 生成角色对显示名称: \"Rick & Morty\" 或 \"Optimus & Bumblebee\"\nconst characterDisplay = `${(mentorName || \"Mentor\").split(\" \")[0]} & ${(learnerName || \"Learner\").split(\" \")[0]}`;\n\n\n// Generate appropriate analogy title\nconst analogyTitle = comicData.coreAnalogy ? 'Core Analogy' : 'Learning Guide';\n// 生成比喻描述\nconst analogyDesc = comicData.coreAnalogy || \n  `Learn ${topicName} through conversations between ${mentorName} and ${learnerName}`;\n\nconst themeCSS = $('theme css').first().json\n\n\n// Replace placeholders in template\nconst finalHTML = mainTemplate\n  .replaceAll('{{TITLE}}', comicData.mainTitle || 'Tech Comic')\n  .replace('{{SUBTITLE}}', subtitle)\n  .replace('{{CYBERPUNK_CSS}}', themeCSS.cyberpunkCSS || '')\n  .replace('{{MINIMAL_CSS}}', themeCSS.minimalCSS || '')\n  .replace('{{CHARACTERS}}', characterDisplay || '')\n  .replace('{{COMPLEXITY}}', comicData.complexity || 'medium')\n  .replace('{{PAGE_COUNT}}', allPages.length.toString())\n  .replace('{{STYLE}}', comicData.artStyle || 'manga')\n  .replace('{{ANALOGY_TITLE}}', analogyTitle)\n  .replace('{{ANALOGY_DESC}}', analogyDesc)\n  .replace('{{PAGES}}', allPagesHTML);\n\nconsole.log('HTML Assembler - Generated final HTML with', allPages.length, 'pages');\n\nreturn [{\n  json: {\n    finalHTML: finalHTML,\n    pageCount: allPages.length,\n    topic: comicData.topic,\n    artStyle: comicData.artStyle,\n    complexity: comicData.complexity\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -41296,
+        -20240
+      ],
+      "id": "ad7a3ca3-207b-45fa-b8d8-9e6a31e699ba",
+      "name": "HTML Assembler"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Character Prompts Library - Define character pairs with their prompts and visual details\n// This library provides reusable character configurations for different comic styles\n\nconst characterPairs = {\n  \"rick_morty\": {\n    name: \"Rick and Morty\",\n    mentor: {\n      name: \"Rick Sanchez\",\n      fullName: \"Rick Sanchez\",\n      emoji: \"🔬\",\n      personality: \"Genius scientist, cynical, impatient but secretly caring\",\n      speech: \"Uses scientific jargon, burps mid-sentence, says 'Morty' a lot\",\n      teachingStyle: \"Explains through wild sci-fi analogies and interdimensional examples\",\n      visualDetails: {\n        hair: \"Spiky blue hair standing up\",\n        clothing: \"White lab coat with stains over gray-blue shirt\",\n        features: \"Unibrow, wrinkled face, bags under eyes\",\n        accessories: \"Flask or sci-fi gadget in hand\",\n        expression: \"Cynical expression or manic grin\",\n        build: \"Lanky build, hunched posture\",\n        skinTone: \"pale peachy/pink\"\n      }\n    },\n    learner: {\n      name: \"Morty Smith\",\n      fullName: \"Morty Smith\",\n      emoji: \"😰\",\n      personality: \"Anxious teenager, eager to learn but easily confused\",\n      speech: \"Stutters ('Aw geez', 'I-I don't know Rick'), asks clarifying questions\",\n      learningStyle: \"Needs simple explanations, makes relatable mistakes\",\n      visualDetails: {\n        hair: \"Brown messy hair\",\n        clothing: \"Bright yellow t-shirt with blue jeans\",\n        features: \"Wide nervous eyes, round face\",\n        expression: \"Anxious or confused expression\",\n        build: \"Shorter than Rick, average teenage build\",\n        gestures: \"Often gesturing nervously with hands\",\n        skinTone: \"peachy/tan\"\n      }\n    },\n    emojiMap: {\n      \"Rick Sanchez\": \"🔬\",\n      \"Morty Smith\": \"😰\"\n    },\n    planningPrompt: `You are Rick Sanchez, the genius scientist from Rick and Morty, tasked with creating educational comics.\nYour role: Analyze the provided topic and create a detailed comic structure plan featuring Rick (mentor) and Morty (learner).\n\n## Character Profiles\n**Rick Sanchez (Mentor)**\n- Genius scientist, cynical, impatient but secretly caring\n- Speech: Uses scientific jargon, burps mid-sentence, says \"Morty\" a lot\n- Teaching style: Explains through wild sci-fi analogies and interdimensional examples\n- Appearance: Spiky blue hair, white lab coat over gray-blue shirt, unibrow, flask in hand\n\n**Morty Smith (Learner)**\n- Anxious teenager, eager to learn but easily confused\n- Speech: Stutters (\"Aw geez\", \"I-I don't know Rick\"), asks clarifying questions\n- Learning style: Needs simple explanations, makes relatable mistakes\n- Appearance: Brown messy hair, bright yellow t-shirt with blue jeans, wide nervous eyes\n\n## Your Task\n1. **Analyze Complexity**: Count core concepts and determine page count\n   - Simple (1-2 concepts): 3-4 pages\n   - Medium (3-5 concepts): 5-8 pages\n   - Complex (6-10 concepts): 9-15 pages\n   - Systematic (10+ concepts): 15-25 pages\n\n2. **Create Comic Structure**: For each page, provide:\n   - Page number and title\n   - Scene description (location in Rick's garage, lab, or interdimensional setting)\n   - Dialogue array: Each page MUST have 2 dialogue entries showing a conversation between BOTH characters. Each dialogue entry must have:\n     * character: \"Rick Sanchez\" or \"Morty Smith\" (use full names)\n     * text: What they say - keep concise, suitable for a single comic panel\n   - Visual elements (what's shown in the panel)\n   - Technical section object:\n     * title: Title of the concept/topic\n     * content: Detailed explanation of the concept or mechanism\n   - Learning point object:\n     * title: Key learning objective\n     * content: What the learner should understand from this page\n\n3. **Dialogue Guidelines - CRITICAL: Story-Driven Learning**:\n\n**Overall Narrative Arc (Across ALL Pages):**\n\nThe complete comic should follow this journey:\n- **Act 1 (Pages 1-2)**: Establish the PROBLEM\n  - Morty encounters a real challenge or confusion about the topic\n  - Show the pain point and its impact\n  - Create emotional investment in finding the solution\n\n- **Act 2 (Pages 3-5)**: Investigate ROOT CAUSE  \n  - Rick guides Morty to analyze the underlying issue\n  - Use sci-fi analogies to reveal hidden patterns\n  - Build understanding step-by-step\n\n- **Act 3 (Pages 6-8)**: Implement SOLUTION\n  - Introduce the solution/concept progressively\n  - Explain core concepts through dialogue\n  - Show how each piece fits together\n\n- **Act 4 (Final 1-2 pages)**: AHA MOMENT & Mastery\n  - Morty demonstrates complete understanding\n  - Success moment with visible results\n  - Reinforce key principles for retention\n\n**Individual Page Structure:**\n\nEach page serves ONE specific purpose in the story:\n- Advances the narrative thread from previous page\n- Introduces ONE new concept or insight\n- Ends with a hook that leads to the next page\n- Maintains conversational flow between Morty and Rick\n\n**Page-to-Page Continuity (MANDATORY):**\n- Page N ends with a question/observation → Page N+1 answers it\n- Reference what was learned in previous pages\n- Build knowledge cumulatively (don't repeat basics)\n- Use \"So that means...\", \"Wait, earlier you said...\", \"Now I understand why...\"\n\n**Dialogue Format (Each Page):**\n- 2 dialogue exchanges between Morty and Rick\n- Natural conversation, not lecture format\n- Morty's questions/observations drive the story forward\n- Rick's responses reveal insights using sci-fi analogies\n\n**Character Roles:**\n\n**Morty (Drives the Story):**\n- Page 1: Expresses the problem/frustration\n- Middle pages: Asks probing questions, makes deductions\n- Final page: Demonstrates mastery, celebrates success\n- Voice: Anxious, curious, uses \"Aw geez!\" and \"Holy crap!\" for realizations\n\n**Rick (Guides Discovery):**\n- Page 1: Acknowledges problem, proposes investigation\n- Middle pages: Reveals insights through interdimensional analogies\n- Final page: Confirms understanding, reinforces principles  \n- Voice: Cynical but helpful, uses \"Listen Morty...\", \"It's simple, Morty...\"\n\n**Forbidden Patterns:**\n- ❌ Each page solving a different problem (breaks continuity)\n- ❌ Repeating information from earlier pages\n- ❌ Page starts without connecting to previous page\n- ❌ Morty asking \"What is X?\" if X was already explained\n- ❌ Rick giving long monologues without Morty interaction\n\n**Validation Checklist:**\n- [ ] Does page 1 establish a CONCRETE problem?\n- [ ] Does each page reference or build upon previous pages?\n- [ ] Is there a clear progression from confusion → understanding?\n- [ ] Does the final page show Morty successfully applying the knowledge?\n- [ ] Would a reader want to turn to the next page to learn more?\n- [ ] Are BOTH characters present in dialogue on EVERY page?\n\n4. **Include Learning Moments**: At least one page must show:\n   - Morty misunderstanding the concept\n   - Rick correcting him with a clearer (but still cynical) explanation\n   - Visual comparison of wrong vs. right understanding\n\n5. **Use Sci-Fi Analogies**: Relate the topic to:\n   - Interdimensional portals, parallel universes\n   - Alien technology, sci-fi gadgets\n   - Rick's inventions and experiments\n   - Portal gun mechanics, dimension-hopping\n\n6. **Art Style Options**: Choose based on user preference or default to manga\n   - manga: Japanese comic style with dynamic panels\n   - minimal: Clean lines, simple backgrounds\n   - cyberpunk: Neon colors, futuristic tech aesthetic\n   - sketch: Hand-drawn, rough artistic style\n\n7. **Character Consistency - CRITICAL**:\n   - Rick ALWAYS wears: white lab coat over gray-blue shirt\n   - Morty ALWAYS wears: bright yellow t-shirt with blue jeans\n   - Do NOT change clothing colors or styles between pages\n\n## Output Structure\nFor each page, return:\n- pageNumber (number)\n- title (string)\n- scene (string)\n- dialogue (array of objects with character and text fields - MUST include both \"Rick Sanchez\" and \"Morty Smith\")\n- visualElements (string)\n- technicalSection (object with title and content)\n- learningPoint (object with title and content)\n- topic (string)\n- artStyle (string)\n\nReturn the complete comic plan in the structured format.\n\n**VALIDATION: Before returning output, ensure EVERY page has dialogue from BOTH Morty Smith AND Rick Sanchez.**`,\n    imagePromptGuidelines: `You are an expert comic image prompt generator specializing in Rick and Morty style educational comics.\nYour task: Transform comic page data into detailed image generation prompts that capture the Rick and Morty aesthetic while clearly explaining the concepts.\n\n## Art Style Guidelines\n\n**manga**: Japanese comic style with dynamic action lines, speed effects, dramatic angles, **FULL COLOR with vibrant tones** (NOT black and white), expressive character reactions, speech bubbles with bold text. Color palette: bright yellows, blues, greens, and lab equipment grays. Rich shading and highlights.\n\n**minimal**: Clean vector art, simple geometric shapes, limited color palette (3-4 colors), clear white backgrounds, focus on essential elements only, simple speech bubbles with sans-serif text\n\n**cyberpunk**: Neon colors (cyan, magenta, yellow), dark backgrounds, holographic interfaces, glitch effects, futuristic tech aesthetic, grid patterns, glowing speech bubbles\n\n**sketch**: Hand-drawn pencil style, visible sketch lines, crosshatching for shading, rough artistic texture, paper texture background, hand-drawn speech bubbles. Can be colored or grayscale based on request.\n\n## Character Visual Details - CRITICAL CONSISTENCY\n\n**Rick Sanchez** (MUST be consistent across ALL pages):\n- Spiky blue hair standing up\n- **White lab coat over gray-blue shirt** (ALWAYS - do not change)\n- Unibrow, wrinkled face, bags under eyes\n- Flask or sci-fi gadget in hand\n- Cynical expression or manic grin\n- Lanky build, hunched posture\n- **Skin tone: pale peachy/pink**\n\n**Morty Smith** (MUST be consistent across ALL pages):\n- Brown messy hair\n- **Bright yellow t-shirt with blue jeans** (ALWAYS - do not change)\n- Wide nervous eyes, round face\n- Anxious or confused expression\n- Shorter than Rick, average teenage build\n- Often gesturing nervously\n- **Skin tone: peachy/tan**\n\n## Speech Bubble Requirements - CRITICAL\n\n**MUST include visible speech bubbles with COMPLETE dialogue text from BOTH characters:**\n- Each character's speech bubble should contain their FULL dialogue text\n- Position speech bubbles clearly near each character\n- Use quotation marks or bubble tails to indicate who is speaking\n- Format: Rick's bubble: \"[Rick's complete dialogue]\" - Morty's bubble: \"[Morty's complete dialogue]\"\n- Bubbles should be readable and not overlap with diagrams\n- Support both English and Chinese dialogue\n\n## Concept/Diagram Integration\n\nFor each concept, include:\n- Clear visual representation of the concept or diagram\n- Labels and arrows showing flow or relationships\n- Color coding to distinguish different components\n- Integration with the scene (holographic display, whiteboard, floating interface)\n- Rick pointing at or interacting with the diagram\n- Ensure diagram doesn't obscure speech bubbles\n\n## Prompt Structure\n\nGenerate prompts in this format:\n\n\"[Art style] comic panel: Rick and Morty in [scene location]. Rick (spiky blue hair, white lab coat over gray-blue shirt) [action]. Morty (brown hair, bright yellow t-shirt, blue jeans) [action]. [Diagram/Visual description]. Speech bubbles visible - Rick's bubble: '[COMPLETE Rick dialogue]' - Morty's bubble: '[COMPLETE Morty dialogue]'. [Mood/lighting]. **Full color, vibrant tones**. High quality, detailed.\"\n\n## Critical Requirements for Output\n\nYour generated prompt MUST:\n1. Include \"[Character]'s bubble: '[COMPLETE dialogue text]'\" for BOTH Rick and Morty\n2. **ALWAYS specify Rick's clothing: \"white lab coat over gray-blue shirt\"**\n3. **ALWAYS specify Morty's clothing: \"bright yellow t-shirt with blue jeans\"**\n4. Place dialogue specifications clearly in the prompt\n5. Ensure dialogue text is from the input page data\n6. **ALWAYS specify \"Full color, vibrant tones\" for manga style**\n7. Never deviate from the character clothing descriptions\n\n**VALIDATION**: Before returning, verify:\n- Rick is wearing \"white lab coat over gray-blue shirt\"\n- Morty is wearing \"bright yellow t-shirt with blue jeans\"\n- Both characters have complete dialogue bubbles\n- \"Full color\" specification is present\n\nReturn ONLY the prompt text, no additional explanation.`,\n    settings: [\"Rick's garage\", \"interdimensional lab\", \"sci-fi laboratory\", \"portal room\"],\n    analogyStyle: \"Interdimensional portals, parallel universes, alien technology, sci-fi gadgets\"\n  },\n  \n  \"optimus_bumblebee\": {\n    name: \"Optimus Prime and Bumblebee\",\n    mentor: {\n      name: \"Optimus Prime\",\n      fullName: \"Optimus Prime\",\n      emoji: \"🤖\",\n      personality: \"Wise leader, noble, patient, values honor and courage\",\n      speech: \"Speaks with gravitas and wisdom, uses 'Freedom is the right of all sentient beings' philosophy\",\n      teachingStyle: \"Explains through transformation principles, modular systems, and Cybertronian technology\",\n      visualDetails: {\n        hair: \"Metallic helmet with iconic red and blue design\",\n        clothing: \"Red and blue armor plating with silver accents\",\n        features: \"Blue optics (glowing eyes), battle mask, noble facial structure\",\n        accessories: \"Ion blaster, transformation matrix glowing in chest\",\n        expression: \"Wise and determined, or contemplative\",\n        build: \"Tall, powerful robotic frame with broad shoulders\",\n        skinTone: \"Metallic red and blue with silver chrome details\"\n      }\n    },\n    learner: {\n      name: \"Bumblebee\",\n      fullName: \"Bumblebee\",\n      emoji: \"🚗\",\n      personality: \"Young eager scout, brave, enthusiastic, loyal\",\n      speech: \"Energetic and enthusiastic, uses radio clips and beeps sometimes, calls Optimus 'sir'\",\n      learningStyle: \"Quick learner, learns through action, asks practical questions\",\n      visualDetails: {\n        hair: \"Yellow helmet with black stripe design\",\n        clothing: \"Yellow and black armor plating\",\n        features: \"Bright blue optics, expressive face, smaller frame\",\n        accessories: \"Plasma cannon, scanner device, speed boosters\",\n        expression: \"Excited, curious, or concentrating intensely\",\n        build: \"Smaller, more agile robotic frame than Optimus\",\n        gestures: \"Dynamic action poses, often ready to transform\",\n        skinTone: \"Bright yellow with black stripes and silver details\"\n      }\n    },\n    emojiMap: {\n      \"Optimus Prime\": \"🤖\",\n      \"Bumblebee\": \"🚗\"\n    },\n    planningPrompt: `You are Optimus Prime, the noble leader of the Autobots, tasked with creating educational comics.\nYour role: Analyze the provided topic and create a detailed comic structure plan featuring Optimus Prime (mentor) and Bumblebee (learner).\n\n## Character Profiles\n**Optimus Prime (Mentor)**\n- Wise leader, noble, patient, values honor and courage\n- Speech: Speaks with gravitas and wisdom, uses transformation and unity metaphors\n- Teaching style: Explains through modular systems, transformation principles, Cybertronian technology\n- Appearance: Red and blue armor with silver accents, blue glowing optics, battle mask, transformation matrix in chest\n\n**Bumblebee (Learner)**\n- Young eager scout, brave, enthusiastic, loyal\n- Speech: Energetic and enthusiastic, uses beeps and radio clips, calls Optimus 'sir'\n- Learning style: Quick learner, learns through action, asks practical questions\n- Appearance: Yellow and black armor, bright blue optics, smaller agile frame, scanner device\n\n## Your Task\n1. **Analyze Complexity**: Count core concepts and determine page count\n   - Simple (1-2 concepts): 3-4 pages\n   - Medium (3-5 concepts): 5-8 pages\n   - Complex (6-10 concepts): 9-15 pages\n   - Systematic (10+ concepts): 15-25 pages\n\n2. **Create Comic Structure**: For each page, provide:\n   - Page number and title\n   - Scene description (location in Autobot base, Cybertron, battlefield, or Earth garage)\n   - Dialogue array: Each page MUST have 2 dialogue entries showing a conversation between BOTH characters. Each dialogue entry must have:\n     * character: \"Optimus Prime\" or \"Bumblebee\" (use full names)\n     * text: What they say - keep concise, suitable for a single comic panel\n   - Visual elements (what's shown in the panel)\n   - Technical section object:\n     * title: Title of the concept/topic\n     * content: Detailed explanation of the concept or mechanism\n   - Learning point object:\n     * title: Key learning objective\n     * content: What the learner should understand from this page\n\n3. **Dialogue Guidelines - CRITICAL: Story-Driven Learning**:\n\n**Overall Narrative Arc (Across ALL Pages):**\n\nThe complete comic should follow this journey:\n- **Act 1 (Pages 1-2)**: Establish the PROBLEM\n  - Bumblebee encounters a real challenge or confusion about the topic\n  - Show the pain point and its impact\n  - Create emotional investment in finding the solution\n\n- **Act 2 (Pages 3-5)**: Investigate ROOT CAUSE  \n  - Optimus guides Bumblebee to analyze the underlying issue\n  - Use Transformer analogies to reveal hidden patterns\n  - Build understanding step-by-step\n\n- **Act 3 (Pages 6-8)**: Implement SOLUTION\n  - Introduce the solution/concept progressively\n  - Explain core concepts through dialogue\n  - Show how each piece fits together\n\n- **Act 4 (Final 1-2 pages)**: AHA MOMENT & Mastery\n  - Bumblebee demonstrates complete understanding\n  - Success moment with visible results\n  - Reinforce key principles for retention\n\n**Individual Page Structure:**\n\nEach page serves ONE specific purpose in the story:\n- Advances the narrative thread from previous page\n- Introduces ONE new concept or insight\n- Ends with a hook that leads to the next page\n- Maintains conversational flow between Bumblebee and Optimus\n\n**Page-to-Page Continuity (MANDATORY):**\n- Page N ends with a question/observation → Page N+1 answers it\n- Reference what was learned in previous pages\n- Build knowledge cumulatively (don't repeat basics)\n- Use \"So that means...\", \"Wait, earlier you said...\", \"Now I understand why...\"\n\n**Dialogue Format (Each Page):**\n- 2 dialogue exchanges between Bumblebee and Optimus\n- Natural conversation, not lecture format\n- Bumblebee's questions/observations drive the story forward\n- Optimus's responses reveal insights using Transformer analogies\n\n**Character Roles:**\n\n**Bumblebee (Drives the Story):**\n- Page 1: Expresses the problem/frustration\n- Middle pages: Asks probing questions, makes deductions\n- Final page: Demonstrates mastery, celebrates success\n- Voice: Enthusiastic, brave, uses beeps and excited exclamations\n\n**Optimus (Guides Discovery):**\n- Page 1: Acknowledges problem, proposes investigation\n- Middle pages: Reveals insights through transformation analogies\n- Final page: Confirms understanding, reinforces principles  \n- Voice: Wise, patient, uses \"Young scout...\", \"Observe, Bumblebee...\"\n\n**Forbidden Patterns:**\n- ❌ Each page solving a different problem (breaks continuity)\n- ❌ Repeating information from earlier pages\n- ❌ Page starts without connecting to previous page\n- ❌ Bumblebee asking \"What is X?\" if X was already explained\n- ❌ Optimus giving long monologues without Bumblebee interaction\n\n**Validation Checklist:**\n- [ ] Does page 1 establish a CONCRETE problem?\n- [ ] Does each page reference or build upon previous pages?\n- [ ] Is there a clear progression from confusion → understanding?\n- [ ] Does the final page show Bumblebee successfully applying the knowledge?\n- [ ] Would a reader want to turn to the next page to learn more?\n- [ ] Are BOTH characters present in dialogue on EVERY page?\n\n4. **Include Learning Moments**: At least one page must show:\n   - Bumblebee making an eager but incomplete observation\n   - Optimus guiding him to the complete understanding with wisdom\n   - Visual comparison of basic vs. advanced understanding\n\n5. **Use Transformer Analogies**: Relate the topic to:\n   - Transformation sequences (changing states/modes)\n   - Modular robot components (microservices)\n   - Energon flow and power distribution (data pipelines)\n   - Autobot communication networks (APIs)\n   - Cybertronian databases (storage systems)\n\n6. **Art Style Options**: Choose based on user preference or default to manga\n   - manga: Japanese comic style with dynamic panels\n   - minimal: Clean lines, simple backgrounds\n   - cyberpunk: Neon colors, futuristic tech aesthetic\n   - sketch: Hand-drawn, rough artistic style\n\n7. **Character Consistency - CRITICAL**:\n   - Optimus ALWAYS has: red and blue armor with silver accents, blue glowing optics\n   - Bumblebee ALWAYS has: yellow and black armor, blue glowing optics\n   - Do NOT change armor colors or design between pages\n\n## Output Structure\nFor each page, return:\n- pageNumber (number)\n- title (string)\n- scene (string)\n- dialogue (array of objects with character and text fields - MUST include both \"Optimus Prime\" and \"Bumblebee\")\n- visualElements (string)\n- technicalSection (object with title and content)\n- learningPoint (object with title and content)\n- topic (string)\n- artStyle (string)\n\nReturn the complete comic plan in the structured format.\n\n**VALIDATION: Before returning output, ensure EVERY page has dialogue from BOTH Bumblebee AND Optimus Prime.**`,\n    imagePromptGuidelines: `You are an expert comic image prompt generator specializing in Transformers-style educational comics.\nYour task: Transform comic page data into detailed image generation prompts that capture the Transformers aesthetic while clearly explaining the concepts.\n\n## Art Style Guidelines\n\n**manga**: Japanese comic style with dynamic action lines, speed effects, dramatic angles, **FULL COLOR with vibrant tones**, expressive character reactions, speech bubbles with bold text. Color palette: reds, blues, yellows, blacks, and metallic chrome. Rich shading and highlights with metallic sheen effects.\n\n**minimal**: Clean vector art, simple geometric shapes, limited color palette (3-4 colors), clear white backgrounds, focus on essential elements only, simple speech bubbles with sans-serif text\n\n**cyberpunk**: Neon colors (cyan, magenta, yellow), dark backgrounds, holographic interfaces, glitch effects, futuristic tech aesthetic, grid patterns, glowing speech bubbles, energon glow effects\n\n**sketch**: Hand-drawn pencil style, visible sketch lines, crosshatching for shading, rough artistic texture, paper texture background, hand-drawn speech bubbles with mechanical sketch details.\n\n## Character Visual Details - CRITICAL CONSISTENCY\n\n**Optimus Prime** (MUST be consistent across ALL pages):\n- Iconic helmet with red and blue metallic design\n- **Red and blue armor plating with silver chrome accents** (ALWAYS - do not change)\n- Blue glowing optics (eyes)\n- Battle mask or noble face\n- Transformation matrix glowing in chest (blue/orange light)\n- Ion blaster or energon axe as weapon\n- Tall, powerful robotic frame with broad shoulders\n- **Color scheme: Red, blue, and silver metallic** (NEVER change colors)\n\n**Bumblebee** (MUST be consistent across ALL pages):\n- Yellow helmet with black stripe design\n- **Yellow and black armor plating** (ALWAYS - do not change)\n- Bright blue glowing optics (eyes)\n- Expressive face, smaller than Optimus\n- Plasma cannon on arm\n- Scanner device and speed boosters\n- Agile, athletic robotic frame\n- **Color scheme: Yellow with black stripes and silver details** (NEVER change colors)\n\n## Speech Bubble Requirements - CRITICAL\n\n**MUST include visible speech bubbles with COMPLETE dialogue text from BOTH characters:**\n- Each character's speech bubble should contain their FULL dialogue text\n- Position speech bubbles clearly near each character\n- Format: Optimus's bubble: \"[Optimus's complete dialogue]\" - Bumblebee's bubble: \"[Bumblebee's complete dialogue]\"\n- Bubbles should be readable and not overlap with diagrams\n- Can include robotic/mechanical font styling\n- Support both English and Chinese dialogue\n\n## Concept/Diagram Integration\n\nFor each concept, include:\n- Clear visual representation (holographic displays, energon flow charts, Cybertronian schematics)\n- Labels and arrows showing flow\n- Color coding with Autobot blue and energon orange highlights\n- Integration with scene (holographic projections, command center screens)\n- Optimus pointing at or gesturing to diagram\n- Transformation sequence diagrams when relevant\n- Ensure diagram doesn't obscure speech bubbles\n\n## Prompt Structure\n\nGenerate prompts in this format:\n\n\"[Art style] comic panel: Optimus Prime and Bumblebee in [scene location]. Optimus (red and blue armor with silver accents, blue glowing optics) [action]. Bumblebee (yellow and black armor, blue glowing optics) [action]. [Diagram/Visual description]. Speech bubbles visible - Optimus's bubble: '[COMPLETE Optimus dialogue]' - Bumblebee's bubble: '[COMPLETE Bumblebee dialogue]'. [Mood/lighting]. **Full color, metallic sheen, vibrant robot aesthetic**. High quality, detailed.\"\n\n## Critical Requirements for Output\n\nYour generated prompt MUST:\n1. Include \"[Character]'s bubble: '[COMPLETE dialogue text]'\" for BOTH Optimus and Bumblebee\n2. **ALWAYS specify Optimus's colors: \"red and blue armor with silver accents\"**\n3. **ALWAYS specify Bumblebee's colors: \"yellow and black armor\"**\n4. **ALWAYS mention \"blue glowing optics\" for both**\n5. Place dialogue specifications clearly in the prompt\n6. **ALWAYS specify \"Full color, metallic sheen\" for manga style**\n7. Include transformation/energon effects where appropriate\n8. Never deviate from the armor color schemes\n\n**VALIDATION**: Before returning, verify:\n- Optimus has \"red and blue armor with silver accents\"\n- Bumblebee has \"yellow and black armor\"\n- Both have \"blue glowing optics\"\n- Both characters have complete dialogue bubbles\n- \"Full color, metallic\" specification is present\n\nReturn ONLY the prompt text, no additional explanation.`,\n    settings: [\"Autobot base command center\", \"Cybertron data archives\", \"Earth garage hideout\", \"Battlefield with holographic displays\"],\n    analogyStyle: \"Transformation sequences, modular robot systems, energon flow, Autobot communication networks, Cybertronian technology\"\n  },\n  \n  \"batman_robin\": {\n    name: \"Batman and Robin\",\n    mentor: {\n      name: \"Batman\",\n      fullName: \"Batman\",\n      emoji: \"🦇\",\n      personality: \"Brilliant detective, strategic, disciplined, protective mentor\",\n      speech: \"Deep analytical voice, strategic thinking, uses detective terminology\",\n      teachingStyle: \"Explains through logic, deduction, evidence analysis, and tactical thinking\",\n      visualDetails: {\n        hair: \"Black cowl covering head with pointed bat ears\",\n        clothing: \"Dark gray suit with black cape, yellow utility belt, bat symbol on chest\",\n        features: \"White eye lenses in cowl, strong jawline\",\n        accessories: \"Utility belt with gadgets, grappling gun, batarangs\",\n        expression: \"Intense focus, slight smirk, or stern determination\",\n        build: \"Muscular, athletic build, imposing presence\",\n        skinTone: \"Not visible (covered by suit)\"\n      }\n    },\n    learner: {\n      name: \"Robin\",\n      fullName: \"Robin\",\n      emoji: \"🎭\",\n      personality: \"Energetic young hero, eager to learn, acrobatic, loyal\",\n      speech: \"Enthusiastic, asks insightful questions, uses exclamations like 'Holy...'\",\n      learningStyle: \"Learns through action and observation, connects concepts quickly\",\n      visualDetails: {\n        hair: \"Black domino mask showing dark hair\",\n        clothing: \"Red vest with green sleeves and pants, yellow cape, 'R' symbol on chest\",\n        features: \"Young face with domino mask, bright determined eyes\",\n        accessories: \"Utility belt, bo staff, grappling line\",\n        expression: \"Excited, concentrating, or ready for action\",\n        build: \"Lean, athletic acrobat build, shorter than Batman\",\n        gestures: \"Dynamic acrobatic poses, energetic movements\",\n        skinTone: \"Fair/peachy (visible on lower face and neck)\"\n      }\n    },\n    emojiMap: {\n      \"Batman\": \"🦇\",\n      \"Robin\": \"🎭\"\n    },\n    planningPrompt: `You are Batman, the World's Greatest Detective, tasked with creating educational comics.\nYour role: Analyze the provided topic and create a detailed comic structure plan featuring Batman (mentor) and Robin (learner).\n\n## Character Profiles\n**Batman (Mentor)**\n- Brilliant detective, strategic, disciplined, protective mentor\n- Speech: Deep analytical voice, strategic thinking, uses detective terminology\n- Teaching style: Explains through logic, deduction, evidence analysis, Batcomputer systems\n- Appearance: Dark gray suit with black cape and cowl, bat ears, yellow utility belt, white eye lenses\n\n**Robin (Learner)**\n- Energetic young hero, eager to learn, acrobatic, loyal sidekick\n- Speech: Enthusiastic, asks insightful questions, uses exclamations, calls Batman 'Batman' or 'sir'\n- Learning style: Learns through action and observation, connects concepts quickly\n- Appearance: Red vest, green sleeves and pants, yellow cape, 'R' symbol, domino mask, bo staff\n\n## Your Task\n1. **Analyze Complexity**: Count core concepts and determine page count\n   - Simple (1-2 concepts): 3-4 pages\n   - Medium (3-5 concepts): 5-8 pages\n   - Complex (6-10 concepts): 9-15 pages\n   - Systematic (10+ concepts): 15-25 pages\n\n2. **Create Comic Structure**: For each page, provide:\n   - Page number and title\n   - Scene description (location in Batcave, Gotham rooftop, Wayne Manor computer room, or crime scene)\n   - Dialogue array: Each page MUST have 2 dialogue entries showing a conversation between BOTH characters. Each dialogue entry must have:\n     * character: \"Batman\" or \"Robin\" (use these names)\n     * text: What they say - keep concise, suitable for a single comic panel\n   - Visual elements (what's shown in the panel)\n   - Technical section object:\n     * title: Title of the concept/topic\n     * content: Detailed explanation of the concept or mechanism\n   - Learning point object:\n     * title: Key learning objective\n     * content: What the learner should understand from this page\n\n3. **Dialogue Guidelines - CRITICAL: Story-Driven Learning**:\n\n**Overall Narrative Arc (Across ALL Pages):**\n\nThe complete comic should follow this journey:\n- **Act 1 (Pages 1-2)**: Establish the PROBLEM\n  - Robin encounters a real challenge or confusion about the topic\n  - Show the pain point and its impact\n  - Create emotional investment in finding the solution\n\n- **Act 2 (Pages 3-5)**: Investigate ROOT CAUSE  \n  - Batman guides Robin to analyze the underlying issue\n  - Use detective analogies to reveal hidden patterns\n  - Build understanding step-by-step\n\n- **Act 3 (Pages 6-8)**: Implement SOLUTION\n  - Introduce the solution/concept progressively\n  - Explain core concepts through dialogue\n  - Show how each piece fits together\n\n- **Act 4 (Final 1-2 pages)**: AHA MOMENT & Mastery\n  - Robin demonstrates complete understanding\n  - Success moment with visible results\n  - Reinforce key principles for retention\n\n**Individual Page Structure:**\n\nEach page serves ONE specific purpose in the story:\n- Advances the narrative thread from previous page\n- Introduces ONE new concept or insight\n- Ends with a hook that leads to the next page\n- Maintains conversational flow between Robin and Batman\n\n**Page-to-Page Continuity (MANDATORY):**\n- Page N ends with a question/observation → Page N+1 answers it\n- Reference what was learned in previous pages\n- Build knowledge cumulatively (don't repeat basics)\n- Use \"So that means...\", \"Wait, earlier you said...\", \"Now I understand why...\"\n\n**Dialogue Format (Each Page):**\n- 2 dialogue exchanges between Robin and Batman\n- Natural conversation, not lecture format\n- Robin's questions/observations drive the story forward\n- Batman's responses reveal insights using detective analogies\n\n**Character Roles:**\n\n**Robin (Drives the Story):**\n- Page 1: Expresses the problem/frustration\n- Middle pages: Asks probing questions, makes deductions\n- Final page: Demonstrates mastery, celebrates success\n- Voice: Enthusiastic, curious, uses \"Holy [X]!\" for realizations\n\n**Batman (Guides Discovery):**\n- Page 1: Acknowledges problem, proposes investigation\n- Middle pages: Reveals insights through detective analogies\n- Final page: Confirms understanding, reinforces principles  \n- Voice: Analytical, uses \"Observe...\", \"The evidence shows...\"\n\n**Forbidden Patterns:**\n- ❌ Each page solving a different problem (breaks continuity)\n- ❌ Repeating information from earlier pages\n- ❌ Page starts without connecting to previous page\n- ❌ Robin asking \"What is X?\" if X was already explained\n- ❌ Batman giving long monologues without Robin interaction\n\n**Validation Checklist:**\n- [ ] Does page 1 establish a CONCRETE problem?\n- [ ] Does each page reference or build upon previous pages?\n- [ ] Is there a clear progression from confusion → understanding?\n- [ ] Does the final page show Robin successfully applying the knowledge?\n- [ ] Would a reader want to turn to the next page to learn more?\n- [ ] Are BOTH characters present in dialogue on EVERY page?\n\n4. **Include Learning Moments**: At least one page must show:\n   - Robin making an enthusiastic but incomplete deduction\n   - Batman guiding him to complete understanding through logic\n   - Visual comparison of surface clues vs. deeper patterns\n\n5. **Use Detective/Tech Analogies**: Relate the topic to:\n   - Crime scene investigation and evidence tracking (debugging)\n   - Batcomputer database systems (data storage)\n   - Bat-signal network (communication protocols)\n   - Utility belt gadgets (modular tools/APIs)\n   - Gotham City surveillance (monitoring systems)\n   - Case file organization (data structures)\n\n6. **Art Style Options**: Choose based on user preference or default to manga\n   - manga: Japanese comic style with dynamic panels\n   - minimal: Clean lines, simple backgrounds\n   - cyberpunk: Neon colors, futuristic tech aesthetic\n   - sketch: Hand-drawn, rough artistic style\n\n7. **Character Consistency - CRITICAL**:\n   - Batman ALWAYS wears: dark gray suit, black cape and cowl, yellow utility belt\n   - Robin ALWAYS wears: red vest, green sleeves/pants, yellow cape, 'R' symbol\n   - Do NOT change costume colors or design between pages\n\n## Output Structure\nFor each page, return:\n- pageNumber (number)\n- title (string)\n- scene (string)\n- dialogue (array of objects with character and text fields - MUST include both \"Batman\" and \"Robin\")\n- visualElements (string)\n- technicalSection (object with title and content)\n- learningPoint (object with title and content)\n- topic (string)\n- artStyle (string)\n\nReturn the complete comic plan in the structured format.\n\n**VALIDATION: Before returning output, ensure EVERY page has dialogue from BOTH Robin AND Batman.**`,\n    imagePromptGuidelines: `You are an expert comic image prompt generator specializing in Batman and Robin style educational comics.\nYour task: Transform comic page data into detailed image generation prompts that capture the Dark Knight detective aesthetic while clearly explaining the concepts.\n\n## Art Style Guidelines\n\n**manga**: Japanese comic style with dynamic action lines, speed effects, dramatic angles, **FULL COLOR with vibrant tones**, expressive character reactions, speech bubbles with bold text. Color palette: dark grays, blacks, blues for Gotham atmosphere, with red, green, and yellow hero colors. Rich noir-style shading and highlights.\n\n**minimal**: Clean vector art, simple geometric shapes, limited color palette (3-4 colors), clear white backgrounds, focus on essential elements only, simple speech bubbles with sans-serif text\n\n**cyberpunk**: Neon colors (cyan, magenta, yellow), dark backgrounds, holographic interfaces, glitch effects, futuristic tech aesthetic, grid patterns, glowing speech bubbles, Bat-tech glow effects\n\n**sketch**: Hand-drawn pencil style, visible sketch lines, crosshatching for shading, rough artistic texture, paper texture background, hand-drawn speech bubbles with detective noir style.\n\n## Character Visual Details - CRITICAL CONSISTENCY\n\n**Batman** (MUST be consistent across ALL pages):\n- Black cowl with pointed bat ears covering entire head\n- **Dark gray bodysuit with black cape, black bat symbol on chest, yellow utility belt** (ALWAYS - do not change)\n- White eye lenses in cowl (no visible eyes)\n- Strong defined jawline (only visible part of face)\n- Cape flowing dramatically\n- Utility belt with pouches and gadgets\n- Grappling gun, batarangs as accessories\n- Muscular, imposing athletic build\n- **Color scheme: Dark gray suit, black cape/cowl/symbol, yellow belt** (NEVER change)\n\n**Robin** (MUST be consistent across ALL pages):\n- Black domino mask showing dark hair and eyes\n- **Red vest with 'R' symbol, green sleeves and green pants, yellow cape** (ALWAYS - do not change)\n- Young face with determined expression (lower face visible)\n- Bo staff or grappling line as accessories\n- Utility belt (smaller than Batman's)\n- Lean acrobatic athletic build, shorter than Batman\n- Dynamic acrobatic poses\n- **Color scheme: Red vest, green sleeves/pants, yellow cape, black mask** (NEVER change)\n\n## Speech Bubble Requirements - CRITICAL\n\n**MUST include visible speech bubbles with COMPLETE dialogue text from BOTH characters:**\n- Each character's speech bubble should contain their FULL dialogue text\n- Position speech bubbles clearly near each character\n- Format: Batman's bubble: \"[Batman's complete dialogue]\" - Robin's bubble: \"[Robin's complete dialogue]\"\n- Bubbles should be readable and not overlap with diagrams\n- Can include noir/detective comic styling\n- Support both English and Chinese dialogue\n\n## Concept/Diagram Integration\n\nFor each concept, include:\n- Clear visual representation (Batcomputer displays, holographic projections, evidence boards)\n- Labels and arrows showing flow and logical connections\n- Color coding with Bat-tech blue and amber highlights\n- Integration with scene (Batcave computer screens, holographic interfaces)\n- Batman pointing at or analyzing diagram\n- Crime scene/detective aesthetic when relevant\n- Ensure diagram doesn't obscure speech bubbles\n\n## Prompt Structure\n\nGenerate prompts in this format:\n\n\"[Art style] comic panel: Batman and Robin in [scene location]. Batman (dark gray suit, black cape and cowl with bat ears, yellow utility belt) [action]. Robin (red vest with 'R' symbol, green sleeves and pants, yellow cape, black domino mask) [action]. [Diagram/Visual description]. Speech bubbles visible - Batman's bubble: '[COMPLETE Batman dialogue]' - Robin's bubble: '[COMPLETE Robin dialogue]'. [Mood/lighting]. **Full color, noir atmosphere, dynamic comic book style**. High quality, detailed.\"\n\n## Critical Requirements for Output\n\nYour generated prompt MUST:\n1. Include \"[Character]'s bubble: '[COMPLETE dialogue text]'\" for BOTH Batman and Robin\n2. **ALWAYS specify Batman's costume: \"dark gray suit, black cape and cowl, yellow utility belt\"**\n3. **ALWAYS specify Robin's costume: \"red vest with 'R' symbol, green sleeves and pants, yellow cape\"**\n4. **ALWAYS mention Batman's \"white eye lenses\" and Robin's \"black domino mask\"**\n5. Place dialogue specifications clearly in the prompt\n6. **ALWAYS specify \"Full color, noir atmosphere\" for manga style**\n7. Include Bat-tech/detective elements where appropriate\n8. Never deviate from the costume color schemes\n\n**VALIDATION**: Before returning, verify:\n- Batman has \"dark gray suit, black cape/cowl, yellow utility belt\"\n- Robin has \"red vest, green sleeves/pants, yellow cape\"\n- Both characters have complete dialogue bubbles\n- \"Full color, noir\" specification is present\n- Bat-symbol or detective elements mentioned\n\nReturn ONLY the prompt text, no additional explanation.`,\n    settings: [\"Batcave with Batcomputer\", \"Gotham City rooftops\", \"Wayne Manor study\", \"Crime scene investigation\", \"Bat-tech workshop\"],\n    analogyStyle: \"Detective investigation, evidence analysis, Batcomputer systems, crime scene debugging, case file organization, Bat-signal networks\"\n  }\n};\n\n// Return the character library\nreturn [{\n  json: {\n    characterPairs: characterPairs,\n    availablePairs: Object.keys(characterPairs),\n    defaultPair: \"rick_morty\"\n  }\n}];"
+      },
+      "id": "d8df38bf-0bbd-4a47-9c32-bd54b8c5b652",
+      "name": "Character Prompts Library",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -44368,
+        -21232
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "bfa1de8f-1f93-452b-835b-e854b2db74ed",
+              "name": "topic",
+              "value": "={{ $('Form Data Mapper').item.json.topic }}",
+              "type": "string"
+            },
+            {
+              "id": "id-2",
+              "name": "characterPair",
+              "value": "={{ $('Form Data Mapper').item.json.characterPair }}",
+              "type": "string"
+            },
+            {
+              "id": "95077900-68a5-4d0c-ab9a-f4bf882494e2",
+              "name": "artStyle",
+              "value": "={{ $('Form Data Mapper').item.json.artStyle }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -44128,
+        -21232
+      ],
+      "id": "08081119-e490-4c5c-bd67-a936ebfbfec4",
+      "name": "User Input"
+    },
+    {
+      "parameters": {
+        "content": "# 1️⃣  输入与配置模块 (Input & Configuration)\n\nUser input processing and character configuration. \nThis section handles user preferences (topic, character pair, art style) \nand loads character-specific prompts from the library.",
+        "height": 656,
+        "width": 1040,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -44784,
+        -21568
+      ],
+      "typeVersion": 1,
+      "id": "f04c3204-67e3-46c9-ae97-f8de896ab2f7",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "# 2️⃣  内容规划模块 (Content Planning)\n\nAI-powered comic structure planning. Analyzes topic complexity, \ngenerates page structure with dialogues, technical concepts, \nand learning points for each page.",
+        "height": 656,
+        "width": 1472,
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -43664,
+        -21568
+      ],
+      "id": "703c89a4-7fa8-4721-90b4-0198492c7fc6",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "# 5️⃣  HTML 生成模块 (HTML Generation)\n\nAssembles individual pages into HTML format. \nGenerates dialogue sections, combines with images, \nand creates the final comic webpage.",
+        "height": 800,
+        "width": 896
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -41840,
+        -20832
+      ],
+      "id": "7ca353fb-1111-49c6-b788-ae696f60c073",
+      "name": "Sticky Note4"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0d5f8a8a-fbc4-42dc-b483-b75fe9795839",
+              "name": "planningPrompt",
+              "value": "={{ $('Character Prompts Library').item.json.characterPairs[$json.characterPair].planningPrompt }}",
+              "type": "string"
+            },
+            {
+              "id": "c6d73745-f638-42c8-81f2-120730585108",
+              "name": "imagePromptTemplate",
+              "value": "={{ $('Character Prompts Library').item.json.characterPairs[$json.characterPair].imagePromptGuidelines }}",
+              "type": "string"
+            },
+            {
+              "id": "2b3fa52e-25a0-4d6c-84d1-702b2027700f",
+              "name": "mentorName",
+              "value": "={{ $('Character Prompts Library').item.json.characterPairs[$json.characterPair].mentor.fullName }}",
+              "type": "string"
+            },
+            {
+              "id": "9adb600d-547a-4e44-b349-ab68c2216d72",
+              "name": "learnerName",
+              "value": "={{ $('Character Prompts Library').item.json.characterPairs[$json.characterPair].learner.fullName }}",
+              "type": "string"
+            },
+            {
+              "id": "e6530227-ed78-4413-9f84-48e1d5cdd733",
+              "name": "characterPairName",
+              "value": "={{ $('Character Prompts Library').item.json.characterPairs[$json.characterPair].name }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -43888,
+        -21232
+      ],
+      "id": "1af29013-67a5-4a28-83f7-b4779dc89db5",
+      "name": "Extract Character Config"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 将HTML字符串转换为binary数据\nconst htmlContent = $input.first().json.finalHTML;\nconst rawFileName = $('Page Collector').first().json.data[0].mainTitle;\n\n// 清理文件名:去除特殊字符,替换空格\nconst cleanFileName = rawFileName\n  .replace(/[<>:\"/\\\\|?*]/g, '')  // 去除Windows文件系统不允许的字符\n  .replace(/\\s+/g, '_')           // 将空格替换为下划线\n  .replace(/[^\\x00-\\x7F]/g, '')   // 可选:去除非ASCII字符(如果需要的话)\n  .trim()                          // 去除首尾空格\n  .substring(0, 200);              // 限制文件名长度,避免过长\n\n// 如果清理后文件名为空,使用默认名称\nconst finalFileName = cleanFileName || 'untitled';\n\nreturn [{\n  binary: {\n    data: {\n      data: Buffer.from(htmlContent, 'utf8').toString('base64'),\n      mimeType: 'text/html',\n      fileName: finalFileName,\n      fileExtension: 'html'\n    }\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -41120,
+        -20240
+      ],
+      "id": "30d2d23e-8829-4e07-9894-e50f46e2dcb0",
+      "name": "HTML Manager Binary"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "1173326c-df2b-4fba-9022-7e98f0e4eaa4",
+              "name": "cyberpunkCSS",
+              "value": "<style>\n        * {\n            margin: 0;\n            padding: 0;\n            box-sizing: border-box;\n        }\n\n        body {\n            font-family: 'Courier New', 'Roboto Mono', monospace;\n            background: linear-gradient(135deg, #0a0e27 0%, #1a1f3a 100%);\n            color: #e0e7ff;\n            line-height: 1.6;\n            min-height: 100vh;\n            padding: 20px;\n        }\n\n        .container {\n            max-width: 1200px;\n            margin: 0 auto;\n        }\n\n        header {\n            text-align: center;\n            margin-bottom: 40px;\n            padding: 30px;\n            background: rgba(26, 31, 58, 0.95);\n            border-radius: 20px;\n            border: 2px solid #00f0ff;\n            box-shadow: 0 0 30px rgba(0, 240, 255, 0.3), 0 10px 30px rgba(0, 0, 0, 0.5);\n        }\n\n        h1 {\n            font-size: 3rem;\n            background: linear-gradient(90deg, #00f0ff, #ff006e, #00f0ff);\n            -webkit-background-clip: text;\n            -webkit-text-fill-color: transparent;\n            margin-bottom: 15px;\n            text-shadow: 0 0 20px rgba(0, 240, 255, 0.8);\n            letter-spacing: 3px;\n            font-weight: 900;\n        }\n\n        .subtitle {\n            font-size: 1.1rem;\n            color: #00f0ff;\n            margin-bottom: 20px;\n            text-transform: uppercase;\n            letter-spacing: 2px;\n        }\n\n        .stats {\n            display: flex;\n            justify-content: center;\n            gap: 30px;\n            margin-top: 20px;\n            flex-wrap: wrap;\n        }\n\n        .stat-item {\n            background: rgba(0, 240, 255, 0.05);\n            padding: 15px 25px;\n            border-radius: 12px;\n            border: 1px solid #00f0ff;\n            box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);\n        }\n\n        .stat-label {\n            font-size: 0.9rem;\n            color: #8b9dc3;\n            margin-bottom: 5px;\n        }\n\n        .stat-value {\n            font-size: 1.4rem;\n            font-weight: bold;\n            color: #ff006e;\n            text-shadow: 0 0 10px rgba(255, 0, 110, 0.8);\n        }\n\n        .intro-box {\n            background: rgba(0, 240, 255, 0.08);\n            border: 1px solid rgba(0, 240, 255, 0.4);\n            border-radius: 15px;\n            padding: 25px;\n            margin-bottom: 40px;\n            text-align: center;\n            box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);\n        }\n\n        .intro-box h3 {\n            color: #00f0ff;\n            margin-bottom: 10px;\n            font-size: 1.4em;\n            text-shadow: 0 0 15px rgba(0, 240, 255, 0.6);\n        }\n\n        .intro-box p {\n            color: #8b9dc3;\n            font-size: 1.1em;\n            line-height: 1.6;\n        }\n\n        .page {\n            margin: 40px 0;\n            padding: 30px;\n            border-radius: 15px;\n            background: rgba(26, 31, 58, 0.8);\n            border-left: 4px solid #00f0ff;\n            box-shadow: 0 5px 30px rgba(0, 240, 255, 0.2);\n            transition: all 0.3s ease;\n            position: relative;\n        }\n\n        .page::before {\n            content: '';\n            position: absolute;\n            left: 0;\n            top: 0;\n            height: 100%;\n            width: 4px;\n            background: linear-gradient(180deg, #00f0ff, #ff006e);\n            box-shadow: 0 0 15px rgba(0, 240, 255, 0.8);\n        }\n\n        .page:hover {\n            transform: translateX(5px);\n            box-shadow: 0 8px 40px rgba(0, 240, 255, 0.4);\n        }\n\n        .page:nth-child(even) {\n            border-left-color: #ff006e;\n        }\n\n        .page:nth-child(even)::before {\n            background: linear-gradient(180deg, #ff006e, #00f0ff);\n            box-shadow: 0 0 15px rgba(255, 0, 110, 0.8);\n        }\n\n        .page-header {\n            display: flex;\n            align-items: center;\n            gap: 20px;\n            margin-bottom: 25px;\n            justify-content: space-between;\n        }\n\n        .page-number {\n            background: linear-gradient(45deg, #00f0ff, #0088ff);\n            color: white;\n            width: 50px;\n            height: 50px;\n            border-radius: 50%;\n            display: flex;\n            align-items: center;\n            justify-content: center;\n            font-size: 1.4em;\n            font-weight: bold;\n            box-shadow: 0 0 25px rgba(0, 240, 255, 0.8);\n            flex-shrink: 0;\n            border: 2px solid #00f0ff;\n        }\n\n        .page:nth-child(even) .page-number {\n            background: linear-gradient(45deg, #ff006e, #d9004f);\n            box-shadow: 0 0 25px rgba(255, 0, 110, 0.8);\n            border-color: #ff006e;\n        }\n\n        .page-title {\n            color: #00f0ff;\n            font-size: 1.6em;\n            font-weight: bold;\n            text-shadow: 0 0 15px rgba(0, 240, 255, 0.6);\n        }\n\n        .page:nth-child(even) .page-title {\n            color: #ff006e;\n            text-shadow: 0 0 15px rgba(255, 0, 110, 0.6);\n        }\n\n        .page-content {\n            display: flex;\n            flex-wrap: wrap;\n            gap: 30px;\n            align-items: flex-start;\n        }\n\n        .page-image {\n            flex: 1;\n            min-width: 300px;\n            border-radius: 12px;\n            overflow: hidden;\n            box-shadow: 0 10px 30px rgba(0, 240, 255, 0.3);\n            border: 2px solid rgba(0, 240, 255, 0.4);\n            transition: all 0.3s ease;\n        }\n\n        .page-image:hover {\n            transform: scale(1.02);\n            box-shadow: 0 15px 40px rgba(0, 240, 255, 0.5);\n        }\n\n        .page-image img {\n            width: 100%;\n            height: auto;\n            display: block;\n        }\n\n        .page-image-container {\n            flex: 1;\n            min-width: 310px;\n            padding: 20px;\n            display: flex;\n            align-items: center;\n            justify-content: center;\n            background: rgba(10, 14, 39, 0.9);\n        }\n\n        .page-info {\n            flex: 1;\n            padding: 20px;\n            background: rgba(10, 14, 39, 0.9);\n        }\n\n        .page-desc {\n            font-size: 1rem;\n            color: #8b9dc3;\n            margin-bottom: 20px;\n            line-height: 1.5;\n        }\n\n        .dialogue-section {\n            margin-bottom: 25px;\n        }\n\n        .section-title {\n            font-size: 1rem;\n            color: #00f0ff;\n            margin-bottom: 15px;\n            text-transform: uppercase;\n            letter-spacing: 1px;\n        }\n\n        .dialogue-item {\n            margin-bottom: 15px;\n            padding: 12px 15px;\n            background: rgba(0, 240, 255, 0.05);\n            border-radius: 10px;\n            border-left: 3px solid #00f0ff;\n            box-shadow: 0 2px 10px rgba(0, 240, 255, 0.2);\n        }\n\n        .dialogue-item.role-learner {\n            border-left-color: #00f0ff;\n        }\n\n        .dialogue-item.role-mentor {\n            border-left-color: #ff006e;\n            background: rgba(255, 0, 110, 0.05);\n            box-shadow: 0 2px 10px rgba(255, 0, 110, 0.2);\n        }\n\n        .character {\n            font-weight: bold;\n            margin-bottom: 5px;\n            display: flex;\n            align-items: center;\n            gap: 8px;\n        }\n\n        .character.role-learner {\n            color: #00f0ff;\n            text-shadow: 0 0 10px rgba(0, 240, 255, 0.6);\n        }\n\n        .character.role-mentor {\n            color: #ff006e;\n            text-shadow: 0 0 10px rgba(255, 0, 110, 0.6);\n        }\n\n        .character-emoji {\n            font-size: 1.2rem;\n        }\n\n        .dialogue-text {\n            color: #e0e7ff;\n            font-size: 0.95rem;\n        }\n\n        .tech-section {\n            margin-top: 20px;\n            margin-bottom: 20px;\n        }\n\n        .tech-box {\n            background: rgba(0, 0, 0, 0.5);\n            border-radius: 10px;\n            padding: 15px;\n            border: 1px solid rgba(0, 240, 255, 0.3);\n        }\n\n        .tech-label {\n            font-size: 0.9rem;\n            color: #8b9dc3;\n            margin-bottom: 8px;\n            text-transform: uppercase;\n            letter-spacing: 1px;\n        }\n\n        .tech-content {\n            color: #00f0ff;\n            font-family: 'Courier New', monospace;\n            font-size: 0.9rem;\n            background: rgba(0, 0, 0, 0.6);\n            padding: 10px;\n            border-radius: 8px;\n            border: 1px solid rgba(0, 240, 255, 0.4);\n            box-shadow: inset 0 0 20px rgba(0, 240, 255, 0.1);\n        }\n\n        .learning-section {\n            margin-top: 20px;\n            background: rgba(0, 240, 255, 0.08);\n            border-left: 4px solid #00f0ff;\n            border-radius: 10px;\n            padding: 15px;\n        }\n\n        .learning-content {\n            color: #e0e7ff;\n            font-size: 0.95rem;\n            line-height: 1.6;\n            margin-top: 10px;\n        }\n\n        footer {\n            text-align: center;\n            margin-top: 50px;\n            padding-top: 30px;\n            border-top: 1px solid rgba(0, 240, 255, 0.2);\n            color: #8b9dc3;\n        }\n\n        .footer-honest {\n          background: linear-gradient(180deg, rgba(26, 31, 58, 0.8) 0%, rgba(10, 14, 39, 0.95) 100%);\n          border-top: 1px solid rgba(0, 240, 255, 0.3);\n          padding: 50px 20px 30px;\n          margin-top: 80px;\n        }\n        \n        .footer-container {\n          max-width: 900px;\n          margin: 0 auto;\n          display: flex;\n          flex-direction: column;\n          gap: 35px;\n        }\n        \n        .footer-brand {\n          text-align: center;\n        }\n        \n        .brand-header {\n          display: inline-flex;\n          align-items: center;\n          gap: 12px;\n          margin-bottom: 12px;\n        }\n        \n        .brand-icon {\n          font-size: 2rem;\n        }\n        \n        .brand-name {\n          font-size: 1.4rem;\n          font-weight: 600;\n          background: linear-gradient(90deg, #00f0ff, #ff006e);\n          -webkit-background-clip: text;\n          -webkit-text-fill-color: transparent;\n        }\n        \n        .brand-tagline {\n          color: #8b9dc3;\n          font-size: 1rem;\n          line-height: 1.6;\n          max-width: 600px;\n          margin: 0 auto;\n        }\n        \n        .footer-actions {\n          display: flex;\n          justify-content: center;\n          gap: 15px;\n          flex-wrap: wrap;\n        }\n        \n        .btn-primary {\n          display: inline-flex;\n          align-items: center;\n          gap: 8px;\n          background: linear-gradient(135deg, #00f0ff, #0088ff);\n          color: white;\n          padding: 14px 28px;\n          border-radius: 10px;\n          text-decoration: none;\n          font-weight: 600;\n          font-size: 0.95rem;\n          transition: all 0.3s ease;\n          box-shadow: 0 4px 15px rgba(0, 240, 255, 0.5);\n        }\n        \n        .btn-primary:hover {\n          transform: translateY(-2px);\n          box-shadow: 0 6px 20px rgba(0, 240, 255, 0.7);\n        }\n        \n        .btn-secondary {\n          display: inline-flex;\n          align-items: center;\n          color: #00f0ff;\n          padding: 14px 28px;\n          border: 1px solid rgba(0, 240, 255, 0.5);\n          border-radius: 10px;\n          text-decoration: none;\n          font-weight: 500;\n          font-size: 0.95rem;\n          transition: all 0.3s ease;\n        }\n        \n        .btn-secondary:hover {\n          border-color: #00f0ff;\n          color: #00f0ff;\n          background: rgba(0, 240, 255, 0.1);\n          box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);\n        }\n        \n        .footer-legal {\n          text-align: center;\n          padding-top: 30px;\n          border-top: 1px solid rgba(0, 240, 255, 0.2);\n        }\n        \n        .legal-text {\n          display: flex;\n          flex-direction: column;\n          gap: 10px;\n        }\n        \n        .legal-text p {\n          color: #64748b;\n          font-size: 0.875rem;\n        }\n        \n        .legal-text a {\n          color: #00f0ff;\n          text-decoration: none;\n          transition: color 0.2s;\n        }\n        \n        .legal-text a:hover {\n          color: #4dd4ff;\n          text-decoration: underline;\n        }\n        \n        .disclaimer {\n          font-size: 0.8rem !important;\n          color: #475569 !important;\n          font-style: italic;\n        }\n        \n        @media (max-width: 640px) {\n          .footer-actions {\n            flex-direction: column;\n            width: 100%;\n          }\n          \n          .btn-primary,\n          .btn-secondary {\n            width: 100%;\n            justify-content: center;\n          }\n          \n          .brand-tagline {\n            font-size: 0.9rem;\n          }\n        }\n        \n        @media (max-width: 768px) {\n            .page-content {\n                flex-direction: column;\n            }\n\n            .page-image, .page-text {\n                min-width: 100%;\n            }\n\n            h1 {\n                font-size: 2em;\n            }\n\n            .page-title {\n                font-size: 1.3em;\n            }\n        }\n    </style>",
+              "type": "string"
+            },
+            {
+              "id": "988df6a7-0e58-4dc6-a759-ca9dd5d3fb57",
+              "name": "minimalCSS",
+              "value": "<style>\n        * {\n            margin: 0;\n            padding: 0;\n            box-sizing: border-box;\n        }\n\n        body {\n            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;\n            background: #ffffff;\n            background-image: \n                linear-gradient(90deg, rgba(59, 130, 246, 0.03) 1px, transparent 1px),\n                linear-gradient(rgba(59, 130, 246, 0.03) 1px, transparent 1px);\n            background-size: 20px 20px;\n            color: #1e293b;\n            line-height: 1.6;\n            min-height: 100vh;\n            padding: 20px;\n        }\n\n        .container {\n            max-width: 1200px;\n            margin: 0 auto;\n        }\n\n        header {\n            text-align: center;\n            margin-bottom: 40px;\n            padding: 30px;\n            background: #ffffff;\n            border-radius: 20px;\n            border: 2px solid #e2e8f0;\n            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);\n        }\n\n        h1 {\n            font-size: 2.8rem;\n            background: linear-gradient(90deg, #3b82f6, #8b5cf6);\n            -webkit-background-clip: text;\n            -webkit-text-fill-color: transparent;\n            margin-bottom: 15px;\n            font-weight: 800;\n        }\n\n        .subtitle {\n            font-size: 1.2rem;\n            color: #64748b;\n            margin-bottom: 20px;\n        }\n\n        .stats {\n            display: flex;\n            justify-content: center;\n            gap: 30px;\n            margin-top: 20px;\n            flex-wrap: wrap;\n        }\n\n        .stat-item {\n            background: #f8fafc;\n            padding: 15px 25px;\n            border-radius: 12px;\n            border: 1px solid #e2e8f0;\n            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);\n        }\n\n        .stat-label {\n            font-size: 0.9rem;\n            color: #64748b;\n            margin-bottom: 5px;\n        }\n\n        .stat-value {\n            font-size: 1.4rem;\n            font-weight: bold;\n            color: #3b82f6;\n        }\n\n        .intro-box {\n            background: #f0f9ff;\n            border: 2px solid #bfdbfe;\n            border-radius: 15px;\n            padding: 25px;\n            margin-bottom: 40px;\n            text-align: center;\n        }\n\n        .intro-box h3 {\n            color: #1e40af;\n            margin-bottom: 10px;\n            font-size: 1.4em;\n        }\n\n        .intro-box p {\n            color: #64748b;\n            font-size: 1.1em;\n            line-height: 1.6;\n        }\n\n        .page {\n            margin: 40px 0;\n            padding: 30px;\n            border-radius: 15px;\n            background: #ffffff;\n            border-left: 4px solid #3b82f6;\n            box-shadow: 0 2px 15px rgba(0, 0, 0, 0.08);\n            transition: all 0.3s ease;\n        }\n\n        .page:hover {\n            transform: translateX(5px);\n            box-shadow: 0 4px 25px rgba(59, 130, 246, 0.15);\n        }\n\n        .page:nth-child(even) {\n            border-left-color: #8b5cf6;\n        }\n\n        .page-header {\n            display: flex;\n            align-items: center;\n            gap: 20px;\n            margin-bottom: 25px;\n            justify-content: space-between;\n        }\n\n        .page-number {\n            background: #3b82f6;\n            color: white;\n            width: 50px;\n            height: 50px;\n            border-radius: 50%;\n            display: flex;\n            align-items: center;\n            justify-content: center;\n            font-size: 1.4em;\n            font-weight: bold;\n            box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);\n            flex-shrink: 0;\n        }\n\n        .page:nth-child(even) .page-number {\n            background: #8b5cf6;\n            box-shadow: 0 4px 15px rgba(139, 92, 246, 0.3);\n        }\n\n        .page-title {\n            color: #1e40af;\n            font-size: 1.6em;\n            font-weight: bold;\n        }\n\n        .page:nth-child(even) .page-title {\n            color: #6d28d9;\n        }\n\n        .page-content {\n            display: flex;\n            flex-wrap: wrap;\n            gap: 30px;\n            align-items: flex-start;\n        }\n\n        .page-image {\n            flex: 1;\n            min-width: 300px;\n            border-radius: 12px;\n            overflow: hidden;\n            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);\n            border: 2px solid #f1f5f9;\n            transition: all 0.3s ease;\n        }\n\n        .page-image:hover {\n            transform: scale(1.02);\n            box-shadow: 0 8px 30px rgba(59, 130, 246, 0.15);\n        }\n\n        .page-image img {\n            width: 100%;\n            height: auto;\n            display: block;\n        }\n\n        .page-image-container {\n            flex: 1;\n            min-width: 310px;\n            padding: 20px;\n            display: flex;\n            align-items: center;\n            justify-content: center;\n            background: #f8fafc;\n        }\n\n        .page-info {\n            flex: 1;\n            padding: 20px;\n            background: #f8fafc;\n            border-radius: 12px;\n        }\n\n        .page-desc {\n            font-size: 1rem;\n            color: #64748b;\n            margin-bottom: 20px;\n            line-height: 1.5;\n        }\n\n        .dialogue-section {\n            margin-bottom: 25px;\n        }\n\n        .section-title {\n            font-size: 1rem;\n            color: #3b82f6;\n            margin-bottom: 15px;\n            text-transform: uppercase;\n            letter-spacing: 1px;\n            font-weight: 600;\n        }\n\n        .dialogue-item {\n            margin-bottom: 15px;\n            padding: 12px 15px;\n            background: #f8fafc;\n            border-radius: 10px;\n            border-left: 3px solid #3b82f6;\n        }\n\n        .dialogue-item.role-learner {\n            border-left-color: #3b82f6;\n            background: #eff6ff;\n        }\n\n        .dialogue-item.role-mentor {\n            border-left-color: #8b5cf6;\n            background: #faf5ff;\n        }\n\n        .character {\n            font-weight: 600;\n            margin-bottom: 5px;\n            display: flex;\n            align-items: center;\n            gap: 8px;\n        }\n\n        .character.role-learner {\n            color: #1e40af;\n        }\n\n        .character.role-mentor {\n            color: #6d28d9;\n        }\n\n        .character-emoji {\n            font-size: 1.2rem;\n        }\n\n        .dialogue-text {\n            color: #334155;\n            font-size: 0.95rem;\n        }\n\n        .tech-section {\n            margin-top: 20px;\n            margin-bottom: 20px;\n        }\n\n        .tech-box {\n            background: #f1f5f9;\n            border-radius: 10px;\n            padding: 15px;\n        }\n\n        .tech-label {\n            font-size: 0.9rem;\n            color: #64748b;\n            margin-bottom: 8px;\n            text-transform: uppercase;\n            letter-spacing: 1px;\n            font-weight: 600;\n        }\n\n        .tech-content {\n            color: #475569;\n            font-family: 'Courier New', monospace;\n            font-size: 0.9rem;\n            background: #ffffff;\n            padding: 10px;\n            border-radius: 8px;\n            border: 1px solid #cbd5e1;\n        }\n\n        .learning-section {\n            margin-top: 20px;\n            background: #f0fdf4;\n            border-left: 4px solid #22c55e;\n            border-radius: 10px;\n            padding: 15px;\n        }\n\n        .learning-content {\n            color: #334155;\n            font-size: 0.95rem;\n            line-height: 1.6;\n            margin-top: 10px;\n        }\n\n        footer {\n            text-align: center;\n            margin-top: 50px;\n            padding-top: 30px;\n            border-top: 1px solid #e2e8f0;\n            color: #64748b;\n        }\n\n        .footer-honest {\n          background: #f8fafc;\n          border-top: 1px solid #e2e8f0;\n          padding: 50px 20px 30px;\n          margin-top: 80px;\n        }\n        \n        .footer-container {\n          max-width: 900px;\n          margin: 0 auto;\n          display: flex;\n          flex-direction: column;\n          gap: 35px;\n        }\n        \n        .footer-brand {\n          text-align: center;\n        }\n        \n        .brand-header {\n          display: inline-flex;\n          align-items: center;\n          gap: 12px;\n          margin-bottom: 12px;\n        }\n        \n        .brand-icon {\n          font-size: 2rem;\n        }\n        \n        .brand-name {\n          font-size: 1.4rem;\n          font-weight: 600;\n          background: linear-gradient(90deg, #3b82f6, #8b5cf6);\n          -webkit-background-clip: text;\n          -webkit-text-fill-color: transparent;\n        }\n        \n        .brand-tagline {\n          color: #64748b;\n          font-size: 1rem;\n          line-height: 1.6;\n          max-width: 600px;\n          margin: 0 auto;\n        }\n        \n        .footer-actions {\n          display: flex;\n          justify-content: center;\n          gap: 15px;\n          flex-wrap: wrap;\n        }\n        \n        .btn-primary {\n          display: inline-flex;\n          align-items: center;\n          gap: 8px;\n          background: #3b82f6;\n          color: white;\n          padding: 14px 28px;\n          border-radius: 10px;\n          text-decoration: none;\n          font-weight: 600;\n          font-size: 0.95rem;\n          transition: all 0.3s ease;\n          box-shadow: 0 4px 15px rgba(59, 130, 246, 0.3);\n        }\n        \n        .btn-primary:hover {\n          transform: translateY(-2px);\n          box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);\n          background: #2563eb;\n        }\n        \n        .btn-secondary {\n          display: inline-flex;\n          align-items: center;\n          color: #3b82f6;\n          padding: 14px 28px;\n          border: 1px solid #bfdbfe;\n          border-radius: 10px;\n          text-decoration: none;\n          font-weight: 500;\n          font-size: 0.95rem;\n          transition: all 0.3s ease;\n        }\n        \n        .btn-secondary:hover {\n          border-color: #3b82f6;\n          color: #1e40af;\n          background: #eff6ff;\n        }\n        \n        .footer-legal {\n          text-align: center;\n          padding-top: 30px;\n          border-top: 1px solid #e2e8f0;\n        }\n        \n        .legal-text {\n          display: flex;\n          flex-direction: column;\n          gap: 10px;\n        }\n        \n        .legal-text p {\n          color: #64748b;\n          font-size: 0.875rem;\n        }\n        \n        .legal-text a {\n          color: #3b82f6;\n          text-decoration: none;\n          transition: color 0.2s;\n        }\n        \n        .legal-text a:hover {\n          color: #1e40af;\n          text-decoration: underline;\n        }\n        \n        .disclaimer {\n          font-size: 0.8rem !important;\n          color: #94a3b8 !important;\n          font-style: italic;\n        }\n        \n        @media (max-width: 640px) {\n          .footer-actions {\n            flex-direction: column;\n            width: 100%;\n          }\n          \n          .btn-primary,\n          .btn-secondary {\n            width: 100%;\n            justify-content: center;\n          }\n          \n          .brand-tagline {\n            font-size: 0.9rem;\n          }\n        }\n        \n        @media (max-width: 768px) {\n            .page-content {\n                flex-direction: column;\n            }\n\n            .page-image, .page-text {\n                min-width: 100%;\n            }\n\n            h1 {\n                font-size: 2em;\n            }\n\n            .page-title {\n                font-size: 1.3em;\n            }\n        }\n    </style>",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -43568,
+        -21408
+      ],
+      "id": "327b1337-2b74-47f5-bba3-cc4c83054f67",
+      "name": "theme css"
+    },
+    {
+      "parameters": {
+        "formTitle": "AI 自动生成技术科普漫画",
+        "formDescription": "将晦涩的技术概念转化为生动的视觉故事。只需选择“教学拍档”和主题，AI 即可自动为您生成完整的科普漫画。",
+        "formFields": {
+          "values": [
+            {
+              "fieldLabel": "选择教学拍档",
+              "fieldType": "dropdown",
+              "defaultValue": "🔬 Rick & Morty",
+              "fieldOptions": {
+                "values": [
+                  {
+                    "option": "🔬 Rick & Morty"
+                  },
+                  {
+                    "option": "🦇 Batman & Robin"
+                  },
+                  {
+                    "option": "🤖 Optimus Prime & Bumblebee"
+                  }
+                ]
+              },
+              "requiredField": true
+            },
+            {
+              "fieldLabel": "你想学习什么技术概念？",
+              "defaultValue": " Docker Containers",
+              "requiredField": true
+            }
+          ]
+        },
+        "responseMode": "lastNode",
+        "options": {
+          "appendAttribution": false
+        }
+      },
+      "type": "n8n-nodes-base.formTrigger",
+      "typeVersion": 2.2,
+      "position": [
+        -44752,
+        -21232
+      ],
+      "id": "4372ea89-da7f-40c5-ad65-271b2e39283a",
+      "name": "Form Input",
+      "webhookId": "4978fd76-87b5-47a1-b635-ce05d1adeea5"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 新增一个 Code 节点: \"Form Data Mapper\"\n// 放在 Form Input 和 User Input 之间\n\nconst formData = $input.first().json;\n\n// 角色映射\nconst characterMapping = {\n  '🔬 Rick & Morty': 'rick_morty',\n  '🦇 Batman & Robin': 'batman_robin',\n  '🤖 Optimus Prime & Bumblebee': 'optimus_bumblebee'\n};\n\n// 复杂度映射(如果有)\nconst complexityMapping = {\n  'Simple': 'simple',\n  'Medium': 'medium',\n  'Complex': 'complex'\n};\n\n// 取表单数据\nconst displayName = formData['选择教学拍档'];\nconst topic = formData['你想学习什么技术概念？'];\nconst complexity = formData['Complexity Level'] || 'medium';\n\n// 转换为后端需要的格式\nconst mappedData = {\n  characterPair: characterMapping[displayName] || 'rick_morty',\n  topic: topic,\n  complexity: complexityMapping[complexity] || 'medium',\n  artStyle: 'manga'\n};\n\nreturn [{\n  json: mappedData\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -44560,
+        -21232
+      ],
+      "id": "d8a29478-b546-42c5-9d31-9e2512fb7fb8",
+      "name": "Form Data Mapper"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "openai/gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "openai/gpt-4.1-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -43136,
+        -21024
+      ],
+      "id": "9e5340f0-bad0-4ade-8ac5-603d82aa1b70",
+      "name": "OpenAI Chat Model2",
+      "credentials": {
+        "openAiApi": {
+          "id": "thij5AToxNJKXNde",
+          "name": "AtlasCloud OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"pageNumber\": {\n      \"type\": \"number\",\n      \"description\": \"Page number in the comic sequence\"\n    },\n    \"title\": {\n      \"type\": \"string\",\n      \"description\": \"Title of this comic page\"\n    },\n    \"scene\": {\n      \"type\": \"string\",\n      \"description\": \"Scene description for the comic page setting\"\n    },\n    \"dialogue\": {\n      \"type\": \"array\",\n      \"description\": \"Array of exactly 2 dialogue exchanges between the mentor and learner characters specified in the prompt\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"character\": {\n            \"type\": \"string\",\n            \"description\": \"Character name - must match one of the character names provided in the prompt (mentor or learner)\"\n          },\n          \"text\": {\n            \"type\": \"string\",\n            \"description\": \"The dialogue text\"\n          }\n        },\n        \"required\": [\"character\", \"text\"]\n      },\n      \"minItems\": 2,\n      \"maxItems\": 2\n    },\n    \"visualElements\": {\n      \"type\": \"string\",\n      \"description\": \"Visual elements and character actions to include in the scene\"\n    },\n    \"technicalSection\": {\n      \"type\": \"object\",\n      \"description\": \"Technical concept explanation section\",\n      \"properties\": {\n        \"title\": {\n          \"type\": \"string\",\n          \"description\": \"Title or heading of the technical concept being explained\"\n        },\n        \"content\": {\n          \"type\": \"string\",\n          \"description\": \"Detailed explanation of the technical concept, including diagrams, architecture, and key points\"\n        }\n      },\n      \"required\": [\"title\", \"content\"]\n    },\n    \"learningPoint\": {\n      \"type\": \"object\",\n      \"description\": \"Key learning takeaway from this page\",\n      \"properties\": {\n        \"title\": {\n          \"type\": \"string\",\n          \"description\": \"Title or heading of the main learning point\"\n        },\n        \"content\": {\n          \"type\": \"string\",\n          \"description\": \"Brief summary of what the learner should understand from this page\"\n        }\n      },\n      \"required\": [\"title\", \"content\"]\n    },\n    \"topic\": {\n      \"type\": \"string\",\n      \"description\": \"The overall technical topic being explained\"\n    },\n    \"artStyle\": {\n      \"type\": \"string\",\n      \"description\": \"Art style for the comic\",\n      \"enum\": [\"manga\", \"minimal\", \"cyberpunk\", \"sketch\"]\n    },\n    \"imagePrompt\": {\n      \"type\": \"string\",\n      \"description\": \"Complete detailed image generation prompt for creating the comic page. MUST use the exact character names and visual details provided in the prompt. Include character-specific clothing, features, and dialogue bubbles for BOTH characters.\"\n    }\n  },\n  \"required\": [\n    \"pageNumber\",\n    \"title\",\n    \"scene\",\n    \"dialogue\",\n    \"visualElements\",\n    \"technicalSection\",\n    \"learningPoint\",\n    \"topic\",\n    \"artStyle\",\n    \"imagePrompt\"\n  ]\n}",
+        "autoFix": true
+      },
+      "id": "8ad08105-0da8-4f06-997a-0e019a70f7b4",
+      "name": "Prompt Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        -41792,
+        -21168
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "exhausted-condition",
+              "leftValue": "={{ $json.retryExhausted }}",
+              "rightValue": {},
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -42048,
+        -20496
+      ],
+      "id": "3c974782-1690-417f-9ebe-4ea1aa7da4f4",
+      "name": "Retries Exhausted?"
+    },
+    {
+      "parameters": {
+        "errorMessage": "=Service Temporarily Unavailable\n\nThe AI image generation service is currently experiencing issues and could not generate images after {{ $json.totalRetries }} attempts.\n\nPlease try again later, or consider:\n- Checking your internet connection\n- Adjusting your keyword descriptions\n- Trying at a different time when server load may be lower\n\nWe apologize for the inconvenience."
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        -41792,
+        -20688
+      ],
+      "id": "e341e66e-6ac8-4516-b610-e6100291766a",
+      "name": "Max Retries Reached"
+    },
+    {
+      "parameters": {
+        "errorMessage": "Content flagged as prohibited. Please modify your keywords to avoid potentially sensitive topics including violence, adult content, weapons, or other restricted themes. Try using more educational, neutral, and academic terminology suitable for your target audience."
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        -42304,
+        -20736
+      ],
+      "id": "b035c23d-0ddb-4291-a432-a5dcaf2e26ca",
+      "name": "Prohibited Content End"
+    },
+    {
+      "parameters": {
+        "errorMessage": "Image Generation Failed\n\nThe AI could not generate images for your request. This might be due to:\n- Complex or ambiguous descriptions\n- Server capacity issues\n- Content guidelines\n\nPlease try again with different keywords or at a later time."
+      },
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        -41632,
+        -20240
+      ],
+      "id": "8d753261-d454-408b-8b3d-5a4906c83204",
+      "name": "Image Generation Failed"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4aba0f2f-779a-425f-bbf8-5a7f6dfa0947",
+              "name": "prompt",
+              "value": "={{ $json.output.imagePrompt }}",
+              "type": "string"
+            },
+            {
+              "id": "retry-init",
+              "name": "retryCount",
+              "value": 0,
+              "type": "number"
+            },
+            {
+              "id": "max-retries",
+              "name": "maxRetries",
+              "value": 3,
+              "type": "number"
+            },
+            {
+              "id": "id-4",
+              "name": "pageNumber",
+              "value": "={{ $json.output.pageNumber }}",
+              "type": "number"
+            },
+            {
+              "id": "id-5",
+              "name": "title",
+              "value": "={{ $json.output.title }}",
+              "type": "string"
+            },
+            {
+              "id": "id-8",
+              "name": "dialogue",
+              "value": "={{ JSON.stringify($json.output.dialogue) }}",
+              "type": "array"
+            },
+            {
+              "id": "id-9",
+              "name": "technicalSection",
+              "value": "={{ $json.output.technicalSection }}",
+              "type": "string"
+            },
+            {
+              "id": "id-10",
+              "name": "learningPoint",
+              "value": "={{ $json.output.learningPoint }}",
+              "type": "string"
+            },
+            {
+              "id": "d1fb7765-74a6-4270-9185-09e0e836bdb9",
+              "name": "totalPages",
+              "value": "={{ $('Split Pages into Items').item.json.output.first().json.totalPages }}",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -41248,
+        -21424
+      ],
+      "id": "bb92baef-6469-4d2e-bcb0-db6a996f4c78",
+      "name": "Data Prep"
+    },
+    {
+      "parameters": {
+        "amount": 3
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -42080,
+        -20224
+      ],
+      "id": "608b1572-3e42-4bc4-8b2d-445f1d03e76f",
+      "name": "Retry Delay",
+      "webhookId": "5f74b4ae-5bc6-4b7c-b2e2-3a9e6ff7a24d"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Extract Image Data - 修复版 (增加 totalPages 继承逻辑)\n\nconst inputItem = $input.item;\nconst response = inputItem.json;\nconsole.log('Image Extractor - Processing response');\n\n// 🛠️ 工具函数: 尝试解析 JSON 字符串\nfunction safeParse(data) {\n    if (typeof data === 'string') {\n        try { return JSON.parse(data); } catch (e) { return data; }\n    }\n    return data;\n}\n\n// 🟢 [核心修复] 智能钻探函数 (带继承能力)\nfunction findCoreData(startObject) {\n    let current = startObject;\n    let depth = 0;\n    const maxDepth = 10; \n\n    while (current && depth < maxDepth) {\n        // 1. 🎯 命中目标：数据被包裹在 'output' 中\n        if (current.output && (current.output.pageNumber !== undefined || current.output.title)) {\n            console.log(`[Data Finder] Found data inside 'output' at depth ${depth}`);\n            \n            const childData = current.output;\n            \n            // 🔥 关键修复：继承逻辑 (Inheritance)\n            // 如果儿子(child)没有 totalPages，但父亲(current)有，就继承过来\n            if (!childData.totalPages && current.totalPages) {\n                console.log(`[Data Finder] 👴 父类继承: 将 totalPages (${current.totalPages}) 传给子对象`);\n                childData.totalPages = current.totalPages;\n            }\n            \n            return childData;\n        }\n\n        // 2. 🎯 命中目标：当前层就是数据\n        if (current.pageNumber !== undefined || current.title) {\n             console.log(`[Data Finder] Found flattened data at depth ${depth}`);\n            return current;\n        }\n\n        // 3. ⛏️ 继续挖掘\n        if (current.originalFormData) {\n            current = current.originalFormData;\n            depth++;\n        } else {\n            break;\n        }\n    }\n    return null;\n}\n\n// 1. 获取数据源 (优先 Task ID)\nlet taskNodeData = null;\ntry {\n  taskNodeData = $('Extract Task ID').item.json;\n} catch(e) {}\n\n// 2. 执行查找\n// 这里的顺序很重要：先找 Task ID，再找 Response\nlet originalPageData = findCoreData(taskNodeData) || findCoreData(response);\n\n// 3. 保底默认值\nif (!originalPageData) {\n  console.error(\"❌ 严重警告：数据丢失\");\n  originalPageData = { pageNumber: 0, title: \"Unknown Data\", totalPages: 12 };\n}\n\n// --- 图像提取部分 (精简版，逻辑不变) ---\nconst choice = response.choices?.[0];\nlet imageData = null;\n\nif (choice && choice.message && choice.message.content) {\n    const contentArray = Array.isArray(choice.message.content) ? choice.message.content : [];\n    for (const item of contentArray) {\n        if (item.type === 'image_url' && item.image_url?.url) {\n            imageData = item.image_url.url;\n            if (imageData.startsWith('data:')) {\n                const match = imageData.match(/^data:([^;]+);base64,(.+)$/);\n                if (match) imageData = match[2];\n            }\n            break;\n        }\n    }\n}\n\n// --- 最终返回 ---\n\n// 🛡️ 字段解析保护\nconst finalTechnical = safeParse(originalPageData.technicalSection);\nconst finalLearning = safeParse(originalPageData.learningPoint);\nconst finalDialogue = typeof originalPageData.dialogue === 'string' ? safeParse(originalPageData.dialogue) : originalPageData.dialogue;\n\n// 🛡️ 最终确保 totalPages 存在\n// 如果 originalPageData 里有就用它的，没有就用默认 6\nconst finalTotalPages = originalPageData.totalPages || 6;\n\nreturn {\n  json: {\n    base64Data: imageData,\n    imageUrl: imageData,\n    extractionSuccess: !!imageData,\n    \n    // ✅ 显式输出 totalPages (这是聚合器活下去的关键)\n    totalPages: finalTotalPages,\n    \n    // 透传其他字段\n    pageNumber: originalPageData.pageNumber,\n    title: originalPageData.title,\n    dialogue: finalDialogue,\n    technicalSection: finalTechnical,\n    learningPoint: finalLearning,\n    topic: originalPageData.topic,\n    scene: originalPageData.scene || originalPageData.output?.scene,\n    artStyle: originalPageData.artStyle,\n    // 调试字段，你可以看到最终用了多少页\n    _debugTotalPagesSource: originalPageData.totalPages ? \"Found in Data\" : \"Default 12\"\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -41632,
+        -20416
+      ],
+      "id": "1905350b-c821-41b8-8586-2200cabb7ac7",
+      "name": "Extract Image Data"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "33f73d6e-0438-4c4b-bf97-375980ad8eff",
+              "leftValue": "={{ $json.choices[0]?.finish_reason == \"content_filter\"}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "3ae4f0d0-2467-45aa-90be-620745776742",
+              "leftValue": "={{ $json.error?.type == \"content_policy_violation\" || $json.error?.code == \"content_filter\" }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "b831bb8f-e303-4e0b-aee3-71b9d93a6bd9",
+              "leftValue": "={{ $json.isProhibitedContent }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -42448,
+        -20576
+      ],
+      "id": "b6850d9a-ca08-4bc2-9b4f-320438f80fa2",
+      "name": "Content Filter Check"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Dialogue Generator - 单项处理版本 (Run Once for Each Item)\n// 适配: 处理单个 item，自动保持数据流上下文\n\nconst item = $input.item.json;\n// ⚠️ 获取全局配置 (使用 .first() 因为这些节点只运行一次)\nconst editFields = $('Extract Character Config').first().json;\nconst characterLib = $('Character Prompts Library').first().json;\nconst mainTitle = $('Planning Agent').first().json.output.topic;\n\n// 获取角色配置\nconst mentorName = editFields.mentorName;\nconst learnerName = editFields.learnerName;\n// 注意：这里也要用 .first() 获取用户输入\nconst characterPair = $('User Input').first().json.characterPair || 'rick_morty';\nconst characterEmojis = characterLib.characterPairs[characterPair].emojiMap;\n\n// 对话框模板\nconst dialogueItemTemplate = `            <div class=\"dialogue-item {{CLASSES}}\">\n                <div class=\"character {{CLASSES}}\">\n                    <span class=\"character-emoji\">{{EMOJI}}</span>\n                    <span>{{NAME}}</span>\n                </div>\n                <div class=\"dialogue-text\">{{CONTENT}}</div>\n            </div>`;\n\n// 解析 dialogue 数组\n// 在前面的 Extract Image Data 节点中，我们已经把原始 dialogue 透传过来了\n// 所以直接从 item 中读取即可，不需要再去 Data Prep 查表，这样更安全\nlet dialogueArray = [];\nif (item.dialogue) {\n  try {\n    dialogueArray = typeof item.dialogue === 'string' \n      ? JSON.parse(item.dialogue) \n      : item.dialogue;\n  } catch (e) {\n    console.log(`Failed to parse dialogue for page ${item.pageNumber}:`, e);\n    dialogueArray = [];\n  }\n}\n\n// 生成对话 HTML\nconst dialogueItems = dialogueArray\n  .map((dialogue, dialogueIndex) => {\n    const characterName = dialogue.character || `character${dialogueIndex + 1}`;\n    const isMentor = characterName === mentorName;\n    const isLearner = characterName === learnerName;\n    const roleClass = isMentor ? 'role-mentor' : (isLearner ? 'role-learner' : 'role-unknown');\n    const nameClass = 'char-' + characterName.toLowerCase().replace(/\\s+/g, '-');\n    const allClasses = [roleClass, nameClass].join(' ');\n    const emoji = characterEmojis[characterName] || dialogue.emoji || '💬';\n    \n    return dialogueItemTemplate\n      .replace(/{{CLASSES}}/g, allClasses)\n      .replace('{{EMOJI}}', emoji)\n      .replace('{{NAME}}', characterName)\n      .replace('{{CONTENT}}', dialogue.text || dialogue.dialogue || 'No dialogue');\n  })\n  .join('\\n');\n\nconst dialogueSection = `        <div class=\"dialogue-section\">\n            <div class=\"section-title\">Dialogue</div>\n${dialogueItems}\n        </div>`;\n\n// ✅ 直接返回单个对象\nreturn {\n  json: {\n    ...item, // 保留所有上游传下来的数据 (包括 pageNumber, imageUrl 等)\n    dialogueHTML: dialogueSection,\n    dialogueCount: dialogueArray.length,\n    mainTitle: mainTitle,\n    mentorName: mentorName,\n    learnerName: learnerName\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -41456,
+        -20480
+      ],
+      "id": "c1941245-27c0-4e3e-a30e-660f99e16c4c",
+      "name": "Dialogue Generator"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Page Generator - 单项处理版本 (Run Once for Each Item)\nconst pageData = $input.item.json;\n\nfunction nl2br(text) {\n  if (!text) return '';\n  return String(text).replace(/\\n/g, '<br>');\n}\n\n// 生成安全文件名\nlet safeTopic = (pageData.topic || 'technology_comic').toLowerCase();\nsafeTopic = safeTopic.replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_+|_+$/g, '');\n\nconst imageFileName = `${safeTopic}_page_${pageData.pageNumber}.png`;\nconst pageDesc = pageData.scene || '';\n\n// 解析 technicalSection\nlet technicalSection = pageData.technicalSection;\nif (typeof technicalSection === 'string' && technicalSection.trim()) {\n  try {\n    technicalSection = JSON.parse(technicalSection);\n  } catch (e) {\n    technicalSection = null;\n  }\n}\n\n// 解析 learningPoint\nlet learningPoint = pageData.learningPoint;\nif (typeof learningPoint === 'string' && learningPoint.trim()) {\n  try {\n    learningPoint = JSON.parse(learningPoint);\n  } catch (e) {\n    learningPoint = null;\n  }\n}\n\n// 构建 HTML 片段\nlet technicalSectionHTML = '';\nif (technicalSection?.title && technicalSection?.content) {\n  technicalSectionHTML = `\n                    <div class=\"tech-section\">\n                        <div class=\"tech-box\">\n                            <div class=\"tech-label\">${technicalSection.title}</div>\n                            <div class=\"tech-content\">${nl2br(technicalSection.content)}</div>\n                        </div>\n                    </div>`;\n}\n\nlet learningPointHTML = '';\nif (learningPoint?.title && learningPoint?.content) {\n  learningPointHTML = `\n                    <div class=\"learning-section\">\n                        <div class=\"section-title\">KEY TAKEAWAY</div>\n                        <div class=\"learning-concept\">${learningPoint.title}</div>\n                        <div class=\"learning-content\">${nl2br(learningPoint.content)}</div>\n                    </div>`;\n}\n\n// 页面模板\nconst pageTemplate = `        <div class=\"page\">\n            <div class=\"page-header\">\n                <h2 class=\"page-title\">Page {{PAGE_NUM}}：{{PAGE_TITLE}}</h2>\n                <span class=\"page-number\">{{PAGE_NUM}}</span>\n            </div>\n            <div class=\"page-content\">\n                <div class=\"page-image-container\">\n                    <img src=\"{{IMAGE_FILE}}\" alt=\"Page {{PAGE_NUM}}\" class=\"page-image\">\n                </div>\n                <div class=\"page-info\">\n                    <div class=\"page-desc\">\n                        {{PAGE_DESC}}\n                    </div>\n{{DIALOGUES}}\n{{TECHNICAL_SECTION}}\n{{LEARNING_POINT}}\n                </div>\n            </div>\n        </div>`;\n\n// 替换占位符\n// 注意：dialogueHTML 已经在上一个节点生成好了，直接用\nlet pageHTML = pageTemplate\n  .replace(/{{PAGE_NUM}}/g, String(pageData.pageNumber))\n  .replace(/{{PAGE_TITLE}}/g, pageData.title || 'Untitled')\n  .replace('{{IMAGE_FILE}}', pageData.imageUrl || imageFileName)\n  .replace('{{PAGE_DESC}}', nl2br(pageDesc))\n  .replace('{{DIALOGUES}}', pageData.dialogueHTML || '')\n  .replace('{{TECHNICAL_SECTION}}', technicalSectionHTML)\n  .replace('{{LEARNING_POINT}}', learningPointHTML);\n\n// ✅ 返回单个对象\nreturn {\n  json: {\n    ...pageData,\n    pageHTML: pageHTML,\n    imageFileName: imageFileName,\n    safeTopic: safeTopic\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -41312,
+        -20480
+      ],
+      "id": "da9f4ad6-27da-4d75-9750-161b669ff22d",
+      "name": "Page Generator"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.atlascloud.ai/api/v1/model/generateImage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "model",
+              "value": "google/nano-banana-pro/text-to-image-developer"
+            },
+            {
+              "name": "aspect_ratio",
+              "value": "={{ $json.apiPayload.aspect_ratio }}"
+            },
+            {
+              "name": "enable_base64_output",
+              "value": "false"
+            },
+            {
+              "name": "enable_sync_mode",
+              "value": "false"
+            },
+            {
+              "name": "output_format",
+              "value": "png"
+            },
+            {
+              "name": "prompt",
+              "value": "={{ JSON.stringify($json.apiPayload.prompt) }}"
+            },
+            {
+              "name": "resolution",
+              "value": "2k"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "ce6128a1-efd9-4422-b69e-9deb7d392dd0",
+      "name": "Submit Task",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -44528,
+        -20416
+      ],
+      "retryOnFail": true,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "SZl4TcLCpSN8tvYs",
+          "name": "AtlasCloud Bearer Auth account"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Extract Task ID - 提取任务ID\n// 修改: 适配 Run Once for Each Item 模式\n\nconst response = $input.item.json;  // ← 改这里!\nconst taskId = response.data?.id;\nconst originalData = $('Prepare API Request').item.json;  // ← 改这里!\n\nreturn {  // ← 改这里! 返回单个对象,不是数组\n  json: {\n    taskId: taskId,\n    apiPayload: originalData.apiPayload,\n    retryCount: originalData.retryCount,\n    maxRetries: originalData.maxRetries,\n    originalFormData: originalData.originalFormData\n  }\n};"
+      },
+      "id": "acf7c7b0-38fd-41b2-8c6d-9ad3c2ca3a99",
+      "name": "Extract Task ID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -43984,
+        -20576
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.allCompleted }}",
+              "rightValue": "completed",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e75d898a-14d2-47aa-b24e-4c23012078f7",
+      "name": "Check Task Status",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -42992,
+        -20560
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const response = $input.item.json;\nconst imageUrl = response.data.outputs?.[0];\nconst originalData = $('Extract Task ID').item.json;\n\nreturn {\n  json: {\n    choices: [{\n      message: {\n        role: 'assistant',\n        content: [{\n          type: 'image_url',\n          image_url: {\n            url: imageUrl\n          }\n        }]\n      },\n      finish_reason: 'stop'\n    }],\n    hasImages: !!imageUrl,\n    retriesUsed: originalData.retryCount || 0\n  }\n};"
+      },
+      "id": "95442b78-b148-489a-bb3b-bb450b0ca7e2",
+      "name": "Extract Image URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -42800,
+        -20576
+      ]
+    },
+    {
+      "parameters": {
+        "url": "=https://api.atlascloud.ai/api/v1/model/prediction/{{ $json.taskId }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBearerAuth",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.3,
+      "position": [
+        -43600,
+        -20576
+      ],
+      "id": "c0cfe312-2baa-4076-9520-488bfcf1cf85",
+      "name": "Get Task Result",
+      "retryOnFail": true,
+      "alwaysOutputData": true,
+      "credentials": {
+        "httpBearerAuth": {
+          "id": "SZl4TcLCpSN8tvYs",
+          "name": "AtlasCloud Bearer Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "# 3️⃣ 数据准备模块 (Data Preparation)\n\nPrepares individual page data for processing. \nExtracts and structures page content, dialogue, \ntechnical sections, and learning points.",
+        "height": 656,
+        "width": 1168
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -42112,
+        -21568
+      ],
+      "id": "f1049065-3c9e-4976-b187-0f6ee0446775",
+      "name": "Sticky Note2"
+    },
+    {
+      "parameters": {
+        "content": "# 4️⃣ 图像生成模块 (Image Generation)\n\nGenerates comic panel images using Nano Banana API. \nIncludes task submission, status polling, retry logic \nfor failed generations, and image extraction.",
+        "height": 800,
+        "width": 2880,
+        "color": 6
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -44768,
+        -20832
+      ],
+      "id": "0756f9cb-0c58-4ea4-abfc-19136f2105aa",
+      "name": "Sticky Note3"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -43808,
+        -20576
+      ],
+      "id": "d5e32878-2c27-4b05-ad06-2884c29025f6",
+      "name": "Wait For Generation",
+      "webhookId": "8a1dabbd-b59f-45b9-bb84-eb5aaeb30f8e"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// 重试检查节点 - 检查响应并管理重试逻辑\nconst inputItem = $input.item;\nconst response = inputItem.json;\nconst originalData = $('Prepare API Request').item.json;\nconst currentRetryCount = originalData.retryCount || 0;\nconst maxRetries = originalData.maxRetries || 3;\n\nconsole.log('Retry Checker - Current retry count:', currentRetryCount);\nconsole.log('Retry Checker - Response received:', !!response);\n\n// 检查是否被内容过滤器阻止（OpenRouter 格式）\nconst isProhibitedContent = response.choices?.[0]?.finish_reason === 'content_filter' ||\n                           response.error?.type === 'content_filter' ||\n                           response.error?.code === 'content_policy_violation';\n\nconsole.log('Retry Checker - Prohibited content detected:', isProhibitedContent);\n\n// 如果是被禁内容，直接返回，不进行重试\nif (isProhibitedContent) {\n  console.log('Retry Checker - Content prohibited, skipping retry');\n  return {\n    json: {\n      ...response,\n      isProhibitedContent: true,\n      retriesUsed: currentRetryCount\n    }\n  };\n}\n\n// 检查是否有错误（HTTP错误或API错误）\nconst hasError = inputItem.error || response.error || !response || !response.choices;\n\n// 检查是否有有效的图片响应（检查图片URL而非base64数据）\nconst hasValidImages = response.choices?.some(choice => \n  choice.message?.content?.some(contentItem => \n    contentItem.type === 'image_url' && contentItem.image_url?.url && !contentItem.image_url.url.startsWith('data:')\n  )\n) || false;\n\nconsole.log('Retry Checker - Has error:', hasError);\nconsole.log('Retry Checker - Has valid images:', hasValidImages);\n\n// 如果有错误或无有效图片，且还可以重试\nif ((hasError || !hasValidImages) && currentRetryCount < maxRetries) {\n  console.log(`Retry attempt ${currentRetryCount + 1}/${maxRetries}`);\n  \n  return {\n    json: {\n      ...originalData.originalFormData,\n      retryCount: currentRetryCount + 1,\n      maxRetries: maxRetries,\n      needRetry: true,\n      retryReason: hasError ? 'Network/API error' : 'No valid images in response',\n      apiPayload: $('Prepare API Request').item.json.apiPayload\n    }\n  };\n}\n\n// 如果达到最大重试次数\nif ((hasError || !hasValidImages) && currentRetryCount >= maxRetries) {\n  return {\n    json: {\n      ...response,\n      retryExhausted: true,\n      totalRetries: currentRetryCount,\n      error: 'Maximum retries reached. Service may be temporarily unavailable.'\n    }\n  };\n}\n\n// 成功响应\nconsole.log('Retry Checker - Success response');\nreturn {\n  json: {\n    ...response,\n    hasImages: hasValidImages,\n    retriesUsed: currentRetryCount,\n    apiPayload: $('Prepare API Request').item.json.apiPayload\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -42624,
+        -20576
+      ],
+      "id": "419ed03e-6d2b-453e-86a0-b92b4ee9a7d7",
+      "name": "Check Retry Limit"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "id-1",
+              "leftValue": "={{ $json.data?.status }}",
+              "rightValue": "failed",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "daa0f035-60b2-405d-ae79-29c99cfa493f",
+      "name": "Validate Task Success",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -43408,
+        -20576
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "retry-condition",
+              "leftValue": "={{ $json.needRetry }}",
+              "rightValue": {},
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -42288,
+        -20496
+      ],
+      "id": "34504685-47c5-4bc8-973b-00866b577ffc",
+      "name": "Should Retry?"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "52d310bd-77db-4cae-b867-dc2b910477c4",
+              "leftValue": "={{ $json.hasImages }}",
+              "rightValue": {},
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -41824,
+        -20400
+      ],
+      "id": "6235c1f6-19ef-4321-b18b-c968d643b0b7",
+      "name": "Validate Image Data"
+    },
+    {
+      "parameters": {
+        "jsCode": "const aggregatedItem = $input.first().json; const pagesData = aggregatedItem.data || []; console.log('Sort Pages - Sorting', pagesData.length, 'pages'); const sortedPages = pagesData.sort((a, b) => { const pageNumA = a.pageNumber || 0; const pageNumB = b.pageNumber || 0; return pageNumA - pageNumB; }); console.log('Sort Pages - Sorted page numbers:', sortedPages.map(p => p.pageNumber).join(', ')); return [{ json: { data: sortedPages, pageCount: sortedPages.length } }];"
+      },
+      "id": "2af0dcdb-c1b0-4ce3-933b-8ab8906e4cf9",
+      "name": "Sort Pages by Number",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -41472,
+        -20240
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "openai/gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "openai/gpt-4.1-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -41888,
+        -21024
+      ],
+      "id": "76112353-ef4c-4f55-8355-ada6876da5fc",
+      "name": "OpenAI Chat Model3",
+      "credentials": {
+        "openAiApi": {
+          "id": "thij5AToxNJKXNde",
+          "name": "AtlasCloud OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "google/gemini-3-flash-preview",
+          "mode": "list",
+          "cachedResultName": "google/gemini-3-flash-preview"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -42064,
+        -21168
+      ],
+      "id": "6e4f8b81-234d-4e07-8648-030c191b33c6",
+      "name": "OpenAI Chat Model1",
+      "credentials": {
+        "openAiApi": {
+          "id": "thij5AToxNJKXNde",
+          "name": "AtlasCloud OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "anthropic/claude-opus-4.5-20251101",
+          "mode": "list",
+          "cachedResultName": "anthropic/claude-opus-4.5-20251101"
+        },
+        "responsesApiEnabled": false,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        -43424,
+        -21184
+      ],
+      "id": "e98794b5-25e2-4732-8740-d8155ccd30da",
+      "name": "OpenAI Chat Model",
+      "credentials": {
+        "openAiApi": {
+          "id": "thij5AToxNJKXNde",
+          "name": "AtlasCloud OpenAi account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Prepare Retry Data - 修复版\n// 修复: 针对并行模式，使用 .item 获取当前特定任务的上下文\n\n// 1. 获取当前节点输入的单个 Item (当前失败的任务)\nconst inputItem = $input.item;\n\n// 2. 关键修复: 使用 .item 获取对应的原始数据\n// 这样 n8n 才知道我们要找的是当前这个任务在 \"Extract Task ID\" 时的状态\n// 不要用 .first()，那会导致数据错乱\nconst originalDataNode = $('Extract Task ID').item;\n\n// 安全检查：防止上游数据丢失\nif (!originalDataNode) {\n  throw new Error(\"Critical Error: Lost context from 'Extract Task ID'. Cannot prepare retry.\");\n}\n\nconst originalData = originalDataNode.json;\nconst currentRetryCount = originalData.retryCount || 0;\nconst maxRetries = originalData.maxRetries || 3;\n\nconsole.log(`[Retry Prep] Item Index: ${inputItem.index} | Count: ${currentRetryCount}/${maxRetries}`);\n\n// 3. 返回单个对象 (不是数组!)\n// 因为模式是 Run Once for Each Item\nreturn {\n  json: {\n    // 继承所有原始表单数据 (包含 pageNumber, prompt 等)\n    ...originalData.originalFormData,\n    \n    // 更新计数\n    retryCount: currentRetryCount + 1,\n    maxRetries: maxRetries,\n    \n    // 保持 API 请求体\n    apiPayload: originalData.apiPayload,\n    \n    // 标记需要重试\n    needRetry: true,\n    retryReason: 'Task generation failed (Status check returned failed)'\n  }\n};"
+      },
+      "id": "ffb1d34e-a35e-4adb-b62f-ac6bc796e433",
+      "name": "Prepare Retry Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -43184,
+        -20736
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "33b60865-819a-43cb-9f61-4ba7d32182b2",
+      "name": "Wait Before Retry",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -42992,
+        -20784
+      ],
+      "webhookId": "97049904-8437-4a12-ac30-895d00273242"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "13c21b16-29ce-4f91-b443-ddca3d8decce",
+              "leftValue": "={{ $json.code }}",
+              "rightValue": 429,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "a8f5256f-b07f-4c6d-afa1-b10a9a21c984",
+              "leftValue": "={{ $json.error.status }}",
+              "rightValue": 500,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "0c64b8dd-bbf2-4459-9fbb-a3ac5a557d56",
+              "leftValue": "={{ $json.error.status }}",
+              "rightValue": 429,
+              "operator": {
+                "type": "number",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "60f953d0-c9bd-434c-a5c2-b08b7db26221",
+              "leftValue": "={{ $json.error.code }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -44368,
+        -20416
+      ],
+      "id": "95521a5a-deb1-42a7-90ca-47a42597f86a",
+      "name": "If"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        -43984,
+        -20288
+      ],
+      "id": "e23fcfa3-90ca-4835-8c20-a92c0ca0c3eb",
+      "name": "Wait",
+      "webhookId": "baca358b-ef35-43f4-971e-81634d86f518"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Mode: Run Once for All Items\nconst allTasks = $input.all();\n\n// 统计各种状态\nconst completed = allTasks.filter(t => t.json.data.status === 'completed');\nconst failed = allTasks.filter(t => t.json.data.status === 'failed');\n\n// 关键: 总数减去失败的,只统计有效任务\nconst validTotal = allTasks.length - failed.length;\n\n// 判断: 成功数 = 有效总数\nconst allCompleted = completed.length === validTotal && validTotal > 0;\n\nconsole.log(\"=== Task Status ===\");\nconsole.log(`Completed: ${completed.length}`);\nconsole.log(`Failed: ${failed.length}`);\nconsole.log(`Total: ${allTasks.length}`);\nconsole.log(`Valid Total (exclude failed): ${validTotal}`);\nconsole.log(`All Completed: ${allCompleted}`);\nconsole.log(\"==================\");\n\n// 返回所有任务(包括失败的,但标记会忽略它们)\nreturn allTasks.map(task => ({\n  json: {\n    ...task.json,\n    allCompleted: allCompleted, // 成功数 = 有效总数\n    completedCount: completed.length,\n    failedCount: failed.length,\n    validTotal: validTotal, // 有效总数(排除失败)\n    totalCount: allTasks.length // 原始总数\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -43168,
+        -20560
+      ],
+      "id": "527e8c6f-ca5a-480d-b036-496909913a5d",
+      "name": "Analyze Batch Status"
+    },
+    {
+      "parameters": {
+        "jsCode": "// 🟢 [V4 终极版] Stateful Aggregator\n// 专为修复后的数据流设计：直接读取 input 中的 totalPages\n// 不再需要回头查上游节点，逻辑最稳、最快\n\nconst staticData = $getWorkflowStaticData('global');\nconst execId = $execution.id;\n\n// 1. 初始化当前执行的存储桶\nif (!staticData[execId]) {\n  staticData[execId] = {\n    pages: [],\n    totalPages: null // 🔒 锁定总页数\n  };\n}\n\nconst storage = staticData[execId];\nconsole.log(\"storage: \", storage)\n// 2. 获取新到达的数据 items\nconst newItems = $input.all().map(item => item.json);\n\n// 3. 🎯 核心逻辑：锁定总页数\n// 因为你在 Data Prep 里已经修好了数据，现在 input 里一定有 totalPages\nif (!storage.totalPages) {\n  const itemWithTotal = newItems.find(item => item.totalPages);\n  if (itemWithTotal) {\n    storage.totalPages = itemWithTotal.totalPages;\n    console.log(`[Aggregator] 🎯 锁定目标总数: ${storage.totalPages} (来源: 输入流透传)`);\n  }\n}\n\n// 4. 存入内存 (去重保护)\nfor (const item of newItems) {\n  const exists = storage.pages.find(p => p.pageNumber === item.pageNumber);\n  if (!exists) {\n    storage.pages.push(item);\n  }\n}\n\n// 5. 获取目标数 (优先用锁定的，保底默认 6)\nconst totalExpected = storage.totalPages || 6;\nconst currentCount = storage.pages.length;\n\nconsole.log(`[Aggregator] 📊 进度: ${currentCount} / ${totalExpected}`);\n\n// 6. 判断是否集齐\nif (currentCount >= totalExpected) {\n  console.log('✅ 全员到齐！执行聚合...');\n  \n  // A. 获取数据\n  const finalResult = [...storage.pages];\n  \n  // B. 排序\n  finalResult.sort((a, b) => a.pageNumber - b.pageNumber);\n  \n  // C. 🧹 必须清理内存\n  delete staticData[execId]; \n  \n  // D. 输出结果\n  return {\n    json: {\n      data: finalResult,\n      pageCount: finalResult.length,\n      status: \"completed_all_pages\"\n    }\n  };\n} else {\n  // E. 没齐，继续等待\n  return [];\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -41136,
+        -20480
+      ],
+      "id": "d7ecb5bd-69bd-4cb0-8b10-afb6520d19ad",
+      "name": "Page Collector"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# Comic Page Generation Request\n\n## Character Information (USE THESE EXACT NAMES)\nCharacter Pair: {{ $('Extract Character Config').item.json.characterPairName }}\nMentor: {{ $('Extract Character Config').item.json.mentorName }} \nLearner: {{ $('Extract Character Config').item.json.learnerName }} \n\n## Page Content\nPage {{ $json.json.pageNumber }}: {{ $json.json.title }}\n\nScene: {{ $json.json.scene }}\nDialogue(MUST use exact character names above):\n{{ $json.json.dialogue.map(d => d.character + \" says: \" + d.text).join(\"\\n\") }}\nVisual elements: {{ $json.json.visualElements }}\ntechnical Section: {{ $json.json.technicalSection.content }}\nlearning Point: {{ $json.json.learningPoint.content }}\nArt style: {{ $json.json.artStyle }}\nTopic: {{ $json.json.topic }}\n\n## CRITICAL INSTRUCTIONS FOR IMAGE PROMPT GENERATION:\n\n1. **Character Names**: Use ONLY \"{{ $('Extract Character Config').item.json.mentorName }}\" and \"{{ $('Extract Character Config').item.json.learnerName }}\" in the image prompt\n2. **Dialogue Bubbles**: Include complete dialogue text for BOTH characters as specified above\n3. **Character Consistency**: Refer to the character visual guidelines for accurate appearance details\n4. **No Substitution**: Do NOT use character names from other character pairs\n\nGenerate a complete image prompt following the imagePromptGuidelines provided in the system prompt.",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "={{ $('Extract Character Config').item.json.imagePromptTemplate }}"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.8,
+      "position": [
+        -41968,
+        -21424
+      ],
+      "id": "3c72d9e8-f04e-4595-87fb-1a9beafa1002",
+      "name": "Generate Image Prompts",
+      "retryOnFail": true
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Code节点 - 组装payload并保持重试计数\n// 修改: 适配 Run Once for Each Item 模式\n\n// ========================================\n// 关键改动: 用 $input.item 替代 $input.first()\n// ========================================\nconst currentItem = $input.item.json;  // ← 改这里!\nconst retryCount = currentItem.retryCount || 0;\nconst maxRetries = currentItem.maxRetries || 3;\n\nconsole.log('Code - Processing request, retry count:', retryCount);\nconsole.log('Code - Processing page:', currentItem.pageNumber || 'unknown');\n\n// 检查是否已存在 apiPayload（来自重试流程）\nif (currentItem.apiPayload) {\n  console.log('Code - Using existing apiPayload from retry flow');\n  return {\n    json: {\n      apiPayload: currentItem.apiPayload,\n      retryCount: retryCount,\n      maxRetries: maxRetries,\n      originalFormData: currentItem,\n    }\n  };\n}\n\n// 如果没有现有的 apiPayload，则构建新的\nconsole.log('Code - Building new apiPayload');\nconst prompt = currentItem.prompt;\n\n// 构建 Google Nano Banana Pro API payload\nconst payload = {\n  prompt: String(prompt || '').trim() || '请生成图片',\n  aspect_ratio: '3:4',\n  resolution: '2K'\n};\n\n// ========================================\n// 关键改动: 返回单个对象,不是数组!\n// ========================================\nreturn {\n  json: {\n    apiPayload: payload,\n    retryCount: retryCount,\n    maxRetries: maxRetries,\n    originalFormData: currentItem,\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -44736,
+        -20416
+      ],
+      "id": "1f19a32a-3da0-4646-a9f4-e28db46cfd34",
+      "name": "Prepare API Request"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// 🟢 [Recover Payload]\n// 功能：从 \"Prepare API Request\" 节点找回原始数据，因为 Submit Task 报错把数据弄丢了\n\n// 1. 利用 .item 机制，回溯查找当前任务在提交前的数据\n// 注意：确保这里的节点名称是你 Submit Task 前面那个节点的确切名称\nconst originalNode = $('Prepare API Request').item;\n\nif (!originalNode) {\n  // 如果找不到（极少见），返回当前数据防止报错，但可能还是会变成默认 prompt\n  return { json: { ...$input.item.json } };\n}\n\nconst originalData = originalNode.json;\n\n// 2. 增加重试计数 (避免无限死循环)\n// 读取已有计数，如果没有则为 0\nconst currentRetries = originalData.retryCount || 0;\n\nconsole.log(`[Network Retry] Recovering data for retry ${currentRetries + 1}`);\n\n// 3. 返回恢复后的数据\nreturn {\n  json: {\n    // 恢复所有原始字段 (包含 apiPayload, prompt, pageNumber 等)\n    ...originalData,\n    \n    // 更新重试计数\n    retryCount: currentRetries + 1,\n    \n    // (可选) 记录一下这次报错的原因\n    lastNetworkError: $input.item.json.error?.message || 'Unknown Network Error'\n  }\n};"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -44128,
+        -20352
+      ],
+      "id": "57f6c395-eedc-4222-9a82-99269da83e90",
+      "name": "Prepare Network Retry"
+    },
+    {
+      "parameters": {
+        "content": "# 🎨 PixelSensei\n\n**作用**：Visual learning comics for any concept with iconic characters.\n让 AI 把枯燥的技术概念变成生动的多角色漫画。\n\n[🔥 全网最全保姆级n8n自动化实战课](https://rvfdqgohv5q.feishu.cn/wiki/DkU6we3HGiKgNzkYRHLcOdBMncd?fromScene=spaceOverview)\n\n\n\n📋 **基本信息**\n- **工作流名称**：PixelSensei - AI 技术漫画生成器 \n- **版本**：v1.0\n- **技术栈**：\n  - **Core**：N8N\n  - **LLM**：Claude Opus 4.5 (剧本规划)\n  - **Image**：Nano Banana Pro (Atlas Cloud 并发加速)\n  - **Frontend**：HTML/CSS 动态渲染\n\n- **创建者**：林月半子\n- **公众号**：林月半子的AI笔记\n- **微信**：cloud-native-101\n\n\n\n🔗 **资源获取**\n- **Atlas Cloud 专属注册 (送$1)**：\n  https://www.atlascloud.ai?ref=LJDEMT\n\n- **在线体验 (MuleRun)**：\n  https://mulerun.com/@LunarAITalk/pixelsensei\n\n\n![PixelSensei](https://r2.cloudnative101.net/assets/images/PixelSensei.webp)",
+        "height": 1456,
+        "width": 736,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        -45552,
+        -21568
+      ],
+      "typeVersion": 1,
+      "id": "a2f75684-d160-4216-96c9-660d6f883d62",
+      "name": "Sticky Note5"
+    }
+  ],
+  "pinData": {
+    "Planning Agent": [
+      {
+        "json": {
+          "output": {
+            "topic": "Docker Containers（Docker 容器）",
+            "complexity": "medium",
+            "totalPages": 6,
+            "artStyle": "manga",
+            "coreAnalogy": "Docker 容器就像跨维度的便携式实验室气泡——每个气泡都是一个完全独立、自给自足的环境，可以在任何维度（服务器）中完美运行，不受外部环境影响",
+            "pages": [
+              {
+                "pageNumber": 1,
+                "title": "部署噩梦",
+                "scene": "Rick 的车库实验室，Morty 沮丧地盯着一台冒烟的电脑，屏幕上显示着大量红色错误信息",
+                "dialogue": [
+                  {
+                    "character": "Morty Smith",
+                    "text": "天啊 Rick！我-我的程序在我电脑上跑得好好的，但是部署到服务器上就完全崩溃了！说什么缺少依赖、版本不对..."
+                  },
+                  {
+                    "character": "Rick Sanchez",
+                    "text": "哈！经典的「在我电脑上能跑」问题，Morty。这就像你在 C-137 维度造了个设备，却指望它在 J-19ζ7 维度也能工作一样愚蠢。不同的环境，不同的物理规则！"
+                  }
+                ],
+                "visualElements": "Morty 穿着黄色T恤和蓝色牛仔裤，绝望地抓着头发。电脑屏幕上显示着「ERROR: Module not found」「Python version mismatch」等错误。Rick 穿着白色实验服，手持酒壶，表情不屑",
+                "technicalSection": {
+                  "title": "环境不一致问题",
+                  "content": "在软件开发中，「在我电脑上能跑」是最常见的问题。开发环境和生产环境之间存在差异：不同的操作系统版本、不同的库版本、不同的配置文件、不同的环境变量。这些差异导致应用程序在不同机器上表现不一致，甚至完全无法运行。"
+                },
+                "learningPoint": {
+                  "title": "理解环境依赖问题",
+                  "content": "软件运行需要特定的环境配置，包括操作系统、运行时、库和依赖项。环境不一致是导致部署失败的主要原因。"
+                }
+              },
+              {
+                "pageNumber": 2,
+                "title": "维度气泡理论",
+                "scene": "Rick 打开传送门，展示一个漂浮在虚空中的透明气泡实验室",
+                "dialogue": [
+                  {
+                    "character": "Rick Sanchez",
+                    "text": "听好了 Morty，你知道我怎么在任何维度做实验吗？我用的是*嗝*便携式维度气泡！这个气泡里面有我需要的一切——空气、重力、工具，完全不受外部维度影响！"
+                  },
+                  {
+                    "character": "Morty Smith",
+                    "text": "哦-哦！所以不管你去哪个维度，气泡里面的环境都是一样的？这...这和我的部署问题有什么关系？"
+                  }
+                ],
+                "visualElements": "绿色传送门中浮现出一个发光的透明气泡，里面是一个完整的迷你实验室。气泡外是混乱的异维度空间（紫色漩涡、奇怪生物），但气泡内部整洁有序。Rick 得意地指着气泡",
+                "technicalSection": {
+                  "title": "容器化概念引入",
+                  "content": "Docker 容器的核心思想就是「便携式环境」。容器将应用程序及其所有依赖项（代码、运行时、系统工具、库、配置）打包到一个独立的单元中。这个单元可以在任何支持 Docker 的机器上运行，且行为完全一致。"
+                },
+                "learningPoint": {
+                  "title": "容器 = 便携式运行环境",
+                  "content": "Docker 容器是一种轻量级、可移植的软件包，包含运行应用所需的一切，确保在任何环境中都能一致运行。"
+                }
+              },
+              {
+                "pageNumber": 3,
+                "title": "容器 vs 虚拟机",
+                "scene": "Rick 用全息投影展示两种不同的「维度气泡」结构对比",
+                "dialogue": [
+                  {
+                    "character": "Morty Smith",
+                    "text": "等等 Rick，这听起来像虚拟机啊？我-我之前听说过 VM 也能解决环境问题..."
+                  },
+                  {
+                    "character": "Rick Sanchez",
+                    "text": "错！Morty，虚拟机就像给每个实验室造一整个独立维度——包括物理定律、时间流速、所有东西！而容器？只是一个*嗝*共享同一维度物理规则的气泡。轻量一万倍！"
+                  }
+                ],
+                "visualElements": "全息屏左侧显示一个巨大的完整星球（标注「虚拟机：完整OS」），右侧显示多个小气泡共享同一个星球表面（标注「容器：共享内核」）。虚拟机明显更大更重，容器轻盈高效",
+                "technicalSection": {
+                  "title": "容器与虚拟机的区别",
+                  "content": "虚拟机（VM）虚拟化整个硬件层，每个 VM 运行完整的操作系统（几GB大小，启动需要分钟级）。Docker 容器共享宿主机的操作系统内核，只虚拟化应用层，因此更轻量（几MB到几百MB），启动只需秒级。容器更适合微服务架构和快速部署场景。"
+                },
+                "learningPoint": {
+                  "title": "容器轻量高效",
+                  "content": "容器共享宿主机内核，不需要完整操作系统，因此比虚拟机更轻量、启动更快、资源占用更少。"
+                }
+              },
+              {
+                "pageNumber": 4,
+                "title": "Docker 镜像：蓝图与实例",
+                "scene": "Rick 展示他的「维度气泡制造机」，一个蓝图正在被复制成多个相同的气泡",
+                "dialogue": [
+                  {
+                    "character": "Morty Smith",
+                    "text": "那-那我怎么创建这种气泡呢？我需要每次都从头搭建环境吗？"
+                  },
+                  {
+                    "character": "Rick Sanchez",
+                    "text": "当然不用，Morty！你先创建一个 Docker 镜像——就像气泡的蓝图。然后*嗝*你可以从这个蓝图无限复制出一模一样的容器。蓝图不变，容器就永远一致！"
+                  }
+                ],
+                "visualElements": "Rick 手持一张发光的蓝色蓝图（标注「Dockerfile / 镜像」），蓝图射出光线，生成多个完全相同的气泡实验室（标注「容器实例」）。每个气泡内部配置完全一致",
+                "technicalSection": {
+                  "title": "Docker 镜像与容器的关系",
+                  "content": "Docker 镜像（Image）是只读的模板，包含创建容器所需的指令和文件系统。镜像由 Dockerfile 定义，通过分层构建。容器（Container）是镜像的运行实例，可以被启动、停止、删除。一个镜像可以创建多个容器，就像一个类可以实例化多个对象。"
+                },
+                "learningPoint": {
+                  "title": "镜像是模板，容器是实例",
+                  "content": "Docker 镜像是静态的蓝图，定义了环境配置；容器是镜像的运行时实例，可以创建、运行、销毁。"
+                }
+              },
+              {
+                "pageNumber": 5,
+                "title": "Dockerfile：配方书",
+                "scene": "Morty 在 Rick 的指导下编写第一个「气泡配方」，屏幕上显示 Dockerfile 代码",
+                "dialogue": [
+                  {
+                    "character": "Morty Smith",
+                    "text": "哦！所以 Dockerfile 就像一个配方，告诉 Docker 怎么构建我的环境？先装什么，再装什么？"
+                  },
+                  {
+                    "character": "Rick Sanchez",
+                    "text": "Bingo, Morty！FROM 选择基础维度，RUN 执行命令安装东西，COPY 把你的代码传送进去，CMD 告诉气泡启动时该干嘛。简单得*嗝*连你都能学会！"
+                  }
+                ],
+                "visualElements": "Morty 兴奋地在电脑前打字，屏幕显示：「FROM python:3.9」「RUN pip install flask」「COPY . /app」「CMD python app.py」。Rick 在旁边点头，每行代码旁边有小图标解释其功能",
+                "technicalSection": {
+                  "title": "Dockerfile 核心指令",
+                  "content": "Dockerfile 是构建镜像的脚本。核心指令包括：FROM（指定基础镜像）、RUN（执行命令，如安装依赖）、COPY/ADD（复制文件到镜像）、WORKDIR（设置工作目录）、ENV（设置环境变量）、EXPOSE（声明端口）、CMD/ENTRYPOINT（定义启动命令）。Docker 按顺序执行指令，每条指令创建一个新的镜像层。"
+                },
+                "learningPoint": {
+                  "title": "Dockerfile 定义环境构建步骤",
+                  "content": "Dockerfile 是一个文本文件，包含构建镜像的所有指令，定义了从基础镜像到完整应用环境的每一步。"
+                }
+              },
+              {
+                "pageNumber": 6,
+                "title": "部署成功！",
+                "scene": "Morty 的应用成功运行在多台服务器上，每台服务器上都是相同的容器",
+                "dialogue": [
+                  {
+                    "character": "Morty Smith",
+                    "text": "天哪 Rick！我-我用 docker build 构建了镜像，docker run 启动容器，现在我的应用在开发环境、测试环境、生产环境都完美运行了！再也没有环境问题了！"
+                  },
+                  {
+                    "character": "Rick Sanchez",
+                    "text": "这就是容器化的力量，Morty。「Build once, run anywhere」——构建一次，到处运行。现在你的代码就像我的维度气泡，*嗝*在任何服务器上都能完美工作。恭喜你不再是个完全的白痴了！"
+                  }
+                ],
+                "visualElements": "Morty 穿着黄色T恤，双手举起庆祝。背景显示三台服务器（标注「开发」「测试」「生产」），每台上面都运行着相同的蓝色容器气泡，绿色对勾表示成功。Rick 露出难得的欣慰笑容",
+                "technicalSection": {
+                  "title": "Docker 核心命令与工作流",
+                  "content": "Docker 基本工作流：1) 编写 Dockerfile 定义环境；2) docker build -t myapp . 构建镜像；3) docker run myapp 运行容器；4) docker push 推送到镜像仓库（如 Docker Hub）；5) 在任何机器上 docker pull 和 docker run。常用命令还包括：docker ps（查看运行中容器）、docker images（查看镜像列表）、docker stop/start（停止/启动容器）。"
+                },
+                "learningPoint": {
+                  "title": "Docker 实现一致性部署",
+                  "content": "Docker 容器确保应用在任何环境中行为一致，解决了「在我电脑上能跑」的问题，是现代 DevOps 和微服务架构的基础技术。"
+                }
+              }
+            ]
+          }
+        },
+        "pairedItem": {
+          "item": 0
+        }
+      }
+    ]
+  },
+  "connections": {
+    "Planning Agent": {
+      "main": [
+        [
+          {
+            "node": "Extract Plan Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Comic Plan Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Planning Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Plan Data": {
+      "main": [
+        [
+          {
+            "node": "Split Pages into Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Pages into Items": {
+      "main": [
+        [
+          {
+            "node": "Split Out",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out": {
+      "main": [
+        [
+          {
+            "node": "Generate Image Prompts",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTML Assembler": {
+      "main": [
+        [
+          {
+            "node": "HTML Manager Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Character Prompts Library": {
+      "main": [
+        [
+          {
+            "node": "User Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Input": {
+      "main": [
+        [
+          {
+            "node": "Extract Character Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Character Config": {
+      "main": [
+        [
+          {
+            "node": "theme css",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "theme css": {
+      "main": [
+        [
+          {
+            "node": "Planning Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form Input": {
+      "main": [
+        [
+          {
+            "node": "Form Data Mapper",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Form Data Mapper": {
+      "main": [
+        [
+          {
+            "node": "Character Prompts Library",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model2": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Comic Plan Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prompt Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Generate Image Prompts",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retries Exhausted?": {
+      "main": [
+        [
+          {
+            "node": "Max Retries Reached",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Validate Image Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Data Prep": {
+      "main": [
+        [
+          {
+            "node": "Prepare API Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Retry Delay": {
+      "main": [
+        [
+          {
+            "node": "Prepare API Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Image Data": {
+      "main": [
+        [
+          {
+            "node": "Dialogue Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Content Filter Check": {
+      "main": [
+        [
+          {
+            "node": "Prohibited Content End",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Should Retry?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dialogue Generator": {
+      "main": [
+        [
+          {
+            "node": "Page Generator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Page Generator": {
+      "main": [
+        [
+          {
+            "node": "Page Collector",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Submit Task": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Task ID": {
+      "main": [
+        [
+          {
+            "node": "Wait For Generation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Task Status": {
+      "main": [
+        [
+          {
+            "node": "Extract Image URL",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Task ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Image URL": {
+      "main": [
+        [
+          {
+            "node": "Check Retry Limit",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Task Result": {
+      "main": [
+        [
+          {
+            "node": "Validate Task Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait For Generation": {
+      "main": [
+        [
+          {
+            "node": "Get Task Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Retry Limit": {
+      "main": [
+        [
+          {
+            "node": "Content Filter Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Task Success": {
+      "main": [
+        [
+          {
+            "node": "Prepare Retry Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Analyze Batch Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Should Retry?": {
+      "main": [
+        [
+          {
+            "node": "Retry Delay",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Retries Exhausted?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Image Data": {
+      "main": [
+        [
+          {
+            "node": "Extract Image Data",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Image Generation Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sort Pages by Number": {
+      "main": [
+        [
+          {
+            "node": "HTML Assembler",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Planning Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model3": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Prompt Output Parser",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model1": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Generate Image Prompts",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Retry Data": {
+      "main": [
+        [
+          {
+            "node": "Wait Before Retry",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait Before Retry": {
+      "main": [
+        [
+          {
+            "node": "Prepare API Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Prepare Network Retry",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract Task ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Prepare API Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Batch Status": {
+      "main": [
+        [
+          {
+            "node": "Check Task Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Page Collector": {
+      "main": [
+        [
+          {
+            "node": "Sort Pages by Number",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate Image Prompts": {
+      "main": [
+        [
+          {
+            "node": "Data Prep",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare API Request": {
+      "main": [
+        [
+          {
+            "node": "Submit Task",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Network Retry": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "availableInMCP": false
+  },
+  "versionId": "f7182d7c-f7f3-4d30-86ba-a98428babd32",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a152539bc323133bde80781a1dc51fefe2ad2e9f6579ca96b98f3bb66ae5bb00"
+  },
+  "id": "NaDdp3ofeX8HnwtK",
+  "tags": []
+}
