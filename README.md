@@ -6,6 +6,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 [![n8n version](https://img.shields.io/badge/n8n-1.94.1+-blue.svg?style=flat-square)](https://n8n.io/)
 
+- [guardian-agent-prompts](https://github.com/milkomida77/guardian-agent-prompts) - 49 AI agent system prompts for Claude Code with n8n webhook integration for multi-agent orchestration and automated task delegation. MIT licensed.
 ## Workflows
 
 ### 📂 [GitHub to Feishu Collector](./workflows/github-to-feishu-collector/)
