@@ -1,0 +1,90 @@
+{
+  "name": "Xquik Account Timeline Export",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "id": "971f3c86-9cc6-45aa-b624-940760976fe7",
+      "name": "Daily Schedule",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "url": "={{ 'https://xquik.com/api/v1/x/users/' + encodeURIComponent($env.XQUIK_USERNAME.replace(/^@/, '')) + '/tweets' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "includeReplies",
+              "value": "false"
+            },
+            {
+              "name": "pageSize",
+              "value": "100"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "REPLACE_WITH_XQUIK_CREDENTIAL_ID",
+          "name": "Xquik API Key"
+        }
+      },
+      "id": "ba5561fa-dd79-467f-9e0b-74dce5f44edc",
+      "name": "Fetch Timeline with Xquik",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [240, 0]
+    },
+    {
+      "parameters": {
+        "jsCode": "const tweets = Array.isArray($json.tweets) ? $json.tweets : [];\nconst configuredUsername = $env.XQUIK_USERNAME.replace(/^@/, '');\nconst fetchedAt = new Date().toISOString();\nconst hasNextPage = $json.has_next_page === true;\nconst nextCursor = typeof $json.next_cursor === 'string' ? $json.next_cursor : '';\nconst count = (value) => {\n  const parsed = Number(value ?? 0);\n  return Number.isFinite(parsed) ? parsed : 0;\n};\n\nif (tweets.length === 0) {\n  return [{\n    json: {\n      status: 'no_results',\n      username: configuredUsername,\n      hasNextPage,\n      nextCursor,\n      fetchedAt,\n    },\n  }];\n}\n\nreturn tweets.map((tweet) => {\n  const username = tweet.author?.username ?? configuredUsername;\n  const id = tweet.id ?? '';\n  return {\n    json: {\n      status: 'ok',\n      id,\n      username,\n      text: tweet.text ?? '',\n      createdAt: tweet.createdAt ?? '',\n      engagement: count(tweet.likeCount) + count(tweet.retweetCount) + count(tweet.replyCount) + count(tweet.quoteCount),\n      url: tweet.url ?? (id ? `https://x.com/${username}/status/${id}` : ''),\n      hasNextPage,\n      nextCursor,\n      fetchedAt,\n    },\n  };\n});"
+      },
+      "id": "32c5a074-3277-45a5-bf31-c29236010838",
+      "name": "Normalize Timeline",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [480, 0]
+    },
+    {
+      "parameters": {
+        "content": "## Setup\n\nRequired: `XQUIK_USERNAME` and an HTTP Header Auth credential named `Xquik API Key`\n\nHeader: `x-api-key`\n\nThis workflow reads up to 100 recent public posts and preserves the next cursor.",
+        "height": 220,
+        "width": 360,
+        "color": 5
+      },
+      "id": "7bcfce79-cefe-49be-8321-4b0b81e1febb",
+      "name": "Setup Notes",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [160, 176]
+    }
+  ],
+  "connections": {
+    "Daily Schedule": {
+      "main": [[{ "node": "Fetch Timeline with Xquik", "type": "main", "index": 0 }]]
+    },
+    "Fetch Timeline with Xquik": {
+      "main": [[{ "node": "Normalize Timeline", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}
