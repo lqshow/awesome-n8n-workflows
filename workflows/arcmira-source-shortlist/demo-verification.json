@@ -1,0 +1,76 @@
+{
+  "checked_at": "2026-10-08T17:09:36.389754+00:00",
+  "status": "success",
+  "host_version": "2.41.3",
+  "workflow_sha256": "c776e6a8b642972dfc38da574486b3b0dabfb06c6d048447255e16f3b81d83d9",
+  "runtime_modifications": "Only temporary workflow ID and credential reference; nodes, code and wiring unchanged.",
+  "nodes_executed": [
+    "Manual trigger",
+    "Search input",
+    "Search Arcmira",
+    "Build source shortlist"
+  ],
+  "node_attempt_counts": {
+    "Manual trigger": 1,
+    "Search input": 1,
+    "Search Arcmira": 1,
+    "Build source shortlist": 1
+  },
+  "returned": 3,
+  "requested_window": {
+    "after": "2026-08-01",
+    "before": "2026-09-01"
+  },
+  "applied_window": {
+    "after": "2026-08-01T00:00:00Z",
+    "before": "2026-09-01T00:00:00Z"
+  },
+  "partial": false,
+  "failed_batches": 0,
+  "search_index": {
+    "state": "live",
+    "missing_before": null
+  },
+  "sources": [
+    {
+      "video_id": "t5KsyuXAtK4",
+      "source_watch_url": "https://arcmira.com/watch?v=t5KsyuXAtK4&t=566",
+      "arcmira_url": "https://arcmira.com/watch?v=t5KsyuXAtK4&t=566",
+      "passage_start_seconds": 566,
+      "original_source_url": "https://www.youtube.com/watch?v=t5KsyuXAtK4&t=566s",
+      "published_at": "2026-08-31T16:41:51Z",
+      "transcript_source": "third_party_quick"
+    },
+    {
+      "video_id": "t5KsyuXAtK4",
+      "source_watch_url": "https://arcmira.com/watch?v=t5KsyuXAtK4&t=526",
+      "arcmira_url": "https://arcmira.com/watch?v=t5KsyuXAtK4&t=526",
+      "passage_start_seconds": 526,
+      "original_source_url": "https://www.youtube.com/watch?v=t5KsyuXAtK4&t=526s",
+      "published_at": "2026-08-31T16:41:51Z",
+      "transcript_source": "third_party_quick"
+    },
+    {
+      "video_id": "gWgM6SGFGcM",
+      "source_watch_url": "https://arcmira.com/watch?v=gWgM6SGFGcM&t=833",
+      "arcmira_url": "https://arcmira.com/watch?v=gWgM6SGFGcM&t=833",
+      "passage_start_seconds": 833,
+      "original_source_url": "https://www.youtube.com/watch?v=gWgM6SGFGcM&t=833s",
+      "published_at": "2026-08-27T16:22:31Z",
+      "transcript_source": "third_party_quick"
+    }
+  ],
+  "account_tier": "free",
+  "on_demand_enabled_before": false,
+  "on_demand_enabled_after": false,
+  "credit_delta": 0,
+  "available_credit_delta": 0,
+  "on_demand_delta": 0,
+  "spend_delta_cents": 0,
+  "raw_logs_saved": false,
+  "browser_or_editor_test": false,
+  "temporary_files_database_removed": true,
+  "cli_attempts": 2,
+  "first_attempt": "Exited 0; JSON was suppressed by N8N_LOG_LEVEL=error. Returned data and search-node execution count were not observed. Account-usage observations were unchanged.",
+  "validated_attempt": 2
+}
