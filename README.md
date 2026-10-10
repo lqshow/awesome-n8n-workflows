@@ -48,6 +48,14 @@ Automatically harvest and download articles from Xiaobot columns, converting the
 
 **Tech Stack**: n8n + Crawl4AI + Browser Automation
 
+### 📅 [Yandex Calendar Events via CalDAV](./workflows/yandex-calendar-caldav/)
+
+Create or update Yandex Calendar events from a webhook using CalDAV instead of OAuth. The event payload becomes an `.ics` file that is written with an authenticated PUT request.
+
+**Key Features**: create or update by UID, credential-based auth, works with any CalDAV server, readable status summary
+
+**Tech Stack**: n8n + Yandex Calendar (CalDAV) + HTTP Request
+
 ## Contributing
 
 Contributions are welcome! Please ensure your submission includes:

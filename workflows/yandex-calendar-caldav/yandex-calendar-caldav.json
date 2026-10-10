@@ -1,0 +1,232 @@
+{
+  "name": "Create Yandex Calendar events via CalDAV",
+  "nodes": [
+    {
+      "id": "a150a5e3-7578-400f-92a0-8a02508375c5",
+      "name": "Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -600
+      ],
+      "parameters": {
+        "content": "### How it works\n\nThis workflow exposes a webhook that creates or updates an event in Yandex Calendar over CalDAV.\n\n1. **Event Request** receives a POST request with the event details: title, start, end, all-day flag, optional description and calendar path.\n2. **Set Calendar Options** keeps everything you may want to change in one place - the CalDAV base URL, the target calendar path and the event UID.\n3. **Build iCal Event** turns those fields into an .ics file.\n4. **Upload to Yandex Calendar** writes the file to your calendar with an authenticated HTTP PUT request.\n5. **Format Result** replies with a small JSON summary: HTTP status, a readable note and whether the event was created or updated.\n\nSending the same `uid` again updates the existing event instead of creating a duplicate.\n\n### Setup\n\n1. In Yandex ID open **Security -> App passwords** and create a password for **Calendars (CalDAV)**.\n2. Create an **HTTP Basic Auth** credential with your Yandex login and that app password, then select it in **Upload to Yandex Calendar**.\n3. Create a **Header Auth** credential (header `x-webhook-token`, any secret value you choose) and select it in **Event Request**.\n4. Check `calendarPath` in **Set Calendar Options**, for example `/calendars/user@yandex.ru/events/`.\n\n### Customization tips\n\n- Add attendees, reminders or recurrence inside **Build iCal Event**.\n- Swap **Event Request** for a Schedule Trigger to create repeated events.\n- Extend **Format Result** to post the outcome to Slack or Telegram.",
+        "height": 420,
+        "width": 700,
+        "color": 1
+      }
+    },
+    {
+      "id": "193e44e4-5f28-4505-874e-9059632eb420",
+      "name": "Section: request handling",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -40,
+        -160
+      ],
+      "parameters": {
+        "content": "## 1. Receive and normalize\n\nThe webhook takes the raw event; the Set node holds the base URL, the calendar path and the UID.",
+        "height": 130,
+        "width": 560,
+        "color": 7
+      }
+    },
+    {
+      "id": "1308190c-ebf8-4ed3-a36d-3b5be86ff25d",
+      "name": "Section: calendar write",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        520,
+        -160
+      ],
+      "parameters": {
+        "content": "## 2. Write to the calendar\n\nThe event becomes an .ics file and is PUT to Yandex Calendar; the Code node turns the HTTP status into a short result.",
+        "height": 130,
+        "width": 820,
+        "color": 7
+      }
+    },
+    {
+      "id": "a2f2ccc1-1a15-4eec-8950-8adbcc2240b0",
+      "name": "Event Request",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "4dda8cea-54dd-4a67-b010-e8e4ab068b76",
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "yandex-calendar-event",
+        "responseMode": "lastNode",
+        "responseData": "allEntries",
+        "authentication": "headerAuth",
+        "options": {}
+      },
+      "notes": "Select a Header Auth credential before running: send the secret header on every call."
+    },
+    {
+      "id": "c0590ee2-16f5-417e-b1bb-ad8919a1d045",
+      "name": "Set Calendar Options",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        0
+      ],
+      "parameters": {
+        "mode": "manual",
+        "includeOtherFields": true,
+        "assignments": {
+          "assignments": [
+            {
+              "id": "b8596f52-8243-492c-a0f6-6629987aa100",
+              "name": "caldavBaseUrl",
+              "value": "https://caldav.yandex.ru",
+              "type": "string"
+            },
+            {
+              "id": "e979d766-efe8-4991-834e-e478611d7c04",
+              "name": "calendarPath",
+              "value": "={{ $json.body && $json.body.calendarPath ? $json.body.calendarPath : '/calendars/your-login@yandex.ru/events/' }}",
+              "type": "string"
+            },
+            {
+              "id": "5d696edf-ac23-4fab-9b9d-9978d34edd22",
+              "name": "uid",
+              "value": "={{ $json.body && $json.body.uid ? $json.body.uid : 'event-' + $now.toMillis() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "notes": "The Yandex CalDAV base URL, your calendar path and the event UID live here."
+    },
+    {
+      "id": "291159be-89e7-45ba-9007-5927d92f7b2b",
+      "name": "Build iCal Event",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        0
+      ],
+      "parameters": {
+        "operation": "iCal",
+        "title": "={{ $json.body.title }}",
+        "start": "={{ $json.body.start }}",
+        "end": "={{ $json.body.end }}",
+        "allDay": "={{ $json.body.allDay }}",
+        "additionalFields": {
+          "uid": "={{ $('Set Calendar Options').first().json.uid }}",
+          "description": "={{ $json.body.description || '' }}",
+          "fileName": "={{ $('Set Calendar Options').first().json.uid + '.ics' }}"
+        }
+      },
+      "notes": "Start and end accept anything iCal understands, for example 2026-11-12T09:00:00+03:00."
+    },
+    {
+      "id": "39f9c753-203a-4696-b8a9-1635cab9dd55",
+      "name": "Upload to Yandex Calendar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        820,
+        0
+      ],
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $('Set Calendar Options').first().json.caldavBaseUrl + $('Set Calendar Options').first().json.calendarPath + $('Set Calendar Options').first().json.uid + '.ics' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
+        "options": {
+          "timeout": 30000,
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true,
+              "responseFormat": "text"
+            }
+          }
+        }
+      },
+      "notes": "Use a Yandex CalDAV app password, not your account password. 201 means created, 204 means updated."
+    },
+    {
+      "id": "6616507b-ef69-4253-8ef3-96a3e76adb40",
+      "name": "Format Result",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1080,
+        0
+      ],
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const request = $('Event Request').first().json.body || {};\nconst options = $('Set Calendar Options').first().json;\nconst response = $json || {};\nconst status = Number(response.statusCode || 0);\n\nlet note = 'Yandex Calendar returned an unexpected response';\nif (status === 201) note = 'Event created';\nelse if (status === 204) note = 'Existing event updated';\nelse if (status === 401) note = 'Authentication failed - check the CalDAV app password';\nelse if (status === 403) note = 'This calendar is read-only';\nelse if (status === 404) note = 'Calendar path not found - check calendarPath';\nelse if (status >= 400) note = 'Yandex Calendar returned status ' + status;\n\nreturn [{ json: {\n  uid: String(options.uid || ''),\n  title: String(request.title || ''),\n  start: String(request.start || ''),\n  end: String(request.end || ''),\n  allDay: request.allDay === true,\n  calendarPath: String(options.calendarPath || ''),\n  status,\n  ok: status === 201 || status === 204,\n  note,\n} }];"
+      },
+      "notes": "Maps the CalDAV status code to a readable note and returns a compact JSON result."
+    }
+  ],
+  "connections": {
+    "Event Request": {
+      "main": [
+        [
+          {
+            "node": "Set Calendar Options",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Calendar Options": {
+      "main": [
+        [
+          {
+            "node": "Build iCal Event",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build iCal Event": {
+      "main": [
+        [
+          {
+            "node": "Upload to Yandex Calendar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload to Yandex Calendar": {
+      "main": [
+        [
+          {
+            "node": "Format Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  }
+}
