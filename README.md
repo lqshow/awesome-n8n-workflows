@@ -48,6 +48,14 @@ Automatically harvest and download articles from Xiaobot columns, converting the
 
 **Tech Stack**: n8n + Crawl4AI + Browser Automation
 
+### 🎬 [VideoUpscaler 4K AI Video Upscaler](./workflows/videoupscaler-4k-ai-video/)
+
+Automated 1080p/2K/4K AI video super-resolution workflows powered by [VideoUpscaler](https://videoupscaler.co/integrations) (FlashVSR diffusion video upscaling), including zero-install HTTP long-polling (`?wait=45`), async webhook callbacks, and the official [`n8n-nodes-videoupscaler`](https://www.npmjs.com/package/n8n-nodes-videoupscaler) community node.
+
+**Key Features**: 4K AI video super-resolution, temporal consistency, server-side long-polling, async webhook callbacks, idempotent retries
+
+**Tech Stack**: n8n + [VideoUpscaler API](https://videoupscaler.co/integrations) + [`n8n-nodes-videoupscaler`](https://www.npmjs.com/package/n8n-nodes-videoupscaler)
+
 ## Contributing
 
 Contributions are welcome! Please ensure your submission includes:
