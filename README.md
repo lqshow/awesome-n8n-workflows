@@ -48,6 +48,12 @@ Automatically harvest and download articles from Xiaobot columns, converting the
 
 **Tech Stack**: n8n + Crawl4AI + Browser Automation
 
+### [Arcmira YouTube transcript source shortlist](./workflows/arcmira-source-shortlist/)
+
+Find up to three timestamped passages in indexed YouTube videos, with source links and coverage notes. Includes a [real CLI demo](./workflows/arcmira-source-shortlist/DEMO.md).
+
+**Tech Stack**: n8n built-in nodes + [Arcmira API](https://arcmira.com/docs). An [Arcmira](https://arcmira.com) account is required; limited free access and paid plans are available. Workflow and documentation retain Apache-2.0.
+
 ## Contributing
 
 Contributions are welcome! Please ensure your submission includes:
