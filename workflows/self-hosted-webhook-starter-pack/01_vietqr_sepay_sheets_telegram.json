@@ -1,0 +1,245 @@
+{
+  "name": "01 — VietQR / SePay Webhook -> Google Sheets + Telegram Alert",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "sepay-vietqr-webhook",
+        "responseMode": "responseNode",
+        "options": {
+          "rawBody": true
+        }
+      },
+      "id": "node-webhook-sepay",
+      "name": "Webhook SePay / VietQR",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        220,
+        300
+      ],
+      "webhookId": "sepay-vietqr-vn-01"
+    },
+    {
+      "parameters": {
+        "jsCode": "const headers = $input.first().json.headers || {};\nconst body = $input.first().json.body || $input.first().json || {};\nconst expectedKey = $env.SEPAY_WEBHOOK_API_KEY || 'REPLACE_SEPAY_API_KEY';\nconst authHeader = String(headers.authorization || headers.Authorization || '');\nconst isAuthorized = authHeader === `Apikey ${expectedKey}`;\n\nconst transferType = String(body.transferType || '').toLowerCase();\nconst amountVnd = Math.round(Number(body.transferAmount || 0));\nconst content = String(body.content || body.description || '').trim();\nconst orderMatch = content.match(/\\b(DH|ORD|INV)[A-Z0-9]{4,14}\\b/i);\nconst orderCode = orderMatch ? orderMatch[0].toUpperCase() : 'KHONG_CO_MA_DON';\nconst gateway = String(body.gateway || body.bank || 'VietQR');\nconst txId = String(body.id || body.referenceCode || Date.now());\nconst txDate = String(body.transactionDate || new Date().toISOString());\n\nconst formattedAmount = new Intl.NumberFormat('vi-VN').format(amountVnd) + ' VND';\n\nreturn [{\n  json: {\n    isAuthorized,\n    isCredit: transferType === 'in' && amountVnd > 0,\n    txId,\n    txDate,\n    gateway,\n    amountVnd,\n    formattedAmount,\n    orderCode,\n    content,\n    accountNumber: String(body.accountNumber || ''),\n    telegramMessage: [\n      'TING-TING! NHAN THANH TOAN VIETQR',\n      `Ma don: ${orderCode}`,\n      `So tien: +${formattedAmount}`,\n      `Ngan hang: ${gateway}`,\n      `Noi dung: ${content}`,\n      `Ma GD: ${txId} | ${txDate}`\n    ].join('\\n')\n  }\n}];"
+      },
+      "id": "node-parse-sepay",
+      "name": "Xac thuc & Tach Ma Don",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-auth",
+              "leftValue": "={{ $json.isAuthorized }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "cond-credit",
+              "leftValue": "={{ $json.isCredit }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "node-if-valid",
+      "name": "Hop le & Tien vao > 0?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        700,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID || 'REPLACE_GOOGLE_SHEET_ID' }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "DoanhThu_VietQR",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "ThoiGian": "={{ $json.txDate }}",
+            "MaGiaoDich": "={{ $json.txId }}",
+            "MaDonHang": "={{ $json.orderCode }}",
+            "SoTienVND": "={{ $json.amountVnd }}",
+            "NganHang": "={{ $json.gateway }}",
+            "NoiDung": "={{ $json.content }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "node-sheets-append",
+      "name": "Ghi Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        960,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_CHAT_ID, text: $json.telegramMessage }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "node-telegram-alert",
+      "name": "Bao Telegram Tuc Thi",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        960,
+        360
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, orderCode: $('Xac thuc & Tach Ma Don').first().json.orderCode, txId: $('Xac thuc & Tach Ma Don').first().json.txId }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-respond-ok",
+      "name": "Tra 200 OK cho SePay",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1220,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: false, ignored: true }) }}",
+        "options": {
+          "responseCode": 401
+        }
+      },
+      "id": "node-respond-reject",
+      "name": "Tu choi / Bo qua",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        960,
+        520
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook SePay / VietQR": {
+      "main": [
+        [
+          {
+            "node": "Xac thuc & Tach Ma Don",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Xac thuc & Tach Ma Don": {
+      "main": [
+        [
+          {
+            "node": "Hop le & Tien vao > 0?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Hop le & Tien vao > 0?": {
+      "main": [
+        [
+          {
+            "node": "Ghi Google Sheets",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Bao Telegram Tuc Thi",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Tu choi / Bo qua",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ghi Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "Tra 200 OK cho SePay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "vn-ai-vps-stack-pack-01"
+  },
+  "tags": [
+    {
+      "name": "VietQR"
+    },
+    {
+      "name": "SePay"
+    },
+    {
+      "name": "VN-AI-VPS-Stack"
+    }
+  ]
+}

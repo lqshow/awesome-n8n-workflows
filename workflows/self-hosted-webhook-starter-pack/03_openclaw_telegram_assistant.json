@@ -1,0 +1,211 @@
+{
+  "name": "03 — OpenClaw / n8n Telegram 24/7 Personal Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "id": "node-tg-trigger",
+      "name": "Telegram Trigger 24/7",
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "openclaw-telegram-vn-03"
+    },
+    {
+      "parameters": {
+        "jsCode": "const msg = $input.first().json.message || {};\nconst chatId = String(msg.chat?.id || '');\nconst allowedRaw = String($env.ALLOWED_TELEGRAM_CHAT_ID || '');\nconst allowedIds = allowedRaw.split(',').map((s) => s.trim()).filter(Boolean);\nconst isAllowed = allowedIds.length > 0 && allowedIds.includes(chatId);\nconst text = String(msg.text || '').trim();\n\nlet command = 'chat';\nlet payload = text;\nif (text.startsWith('/tomtat')) {\n  command = 'summarize';\n  payload = text.replace(/^\\/tomtat\\s*/i, '');\n} else if (text.startsWith('/tacvu')) {\n  command = 'agent_task';\n  payload = text.replace(/^\\/tacvu\\s*/i, '');\n}\n\nreturn [{\n  json: {\n    isAllowed,\n    chatId,\n    sender: msg.from?.username || msg.from?.first_name || 'Owner',\n    command,\n    payload,\n    timestamp: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-auth-parse",
+      "name": "Kiem tra Whitelist & Lenh",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-owner",
+              "leftValue": "={{ $json.isAllowed }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "node-if-owner",
+      "name": "Dung Chat ID Chu So Huu?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.OPENCLAW_GATEWAY_URL || 'http://openclaw:18789/v1/chat/completions') }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.OPENCLAW_GATEWAY_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $env.OPENCLAW_MODEL || 'default', user: 'tg-' + $json.chatId, messages: [{ role: 'system', content: 'Ban la tro ly AI ca nhan 24/7 chay tren VPS rieng. Tra loi ngan gon, chinh xac bang tieng Viet.' }, { role: 'user', content: '[' + $json.command + '] ' + $json.payload }] }) }}",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "id": "node-openclaw-bridge",
+      "name": "Chuyen tiep OpenClaw / LLM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        940,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst src = $('Kiem tra Whitelist & Lenh').first().json;\nconst answer = String(resp.choices?.[0]?.message?.content || resp.reply || 'Khong nhan duoc phan hoi tu OpenClaw Gateway.').slice(0, 3900);\nreturn [{ json: { chatId: src.chatId, replyText: answer } }];"
+      },
+      "id": "node-format-reply",
+      "name": "Cat gon Phan hoi Telegram",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1180,
+        220
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $json.chatId, text: $json.replyText }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "node-tg-reply",
+      "name": "Gui Tra loi Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1410,
+        220
+      ]
+    }
+  ],
+  "connections": {
+    "Telegram Trigger 24/7": {
+      "main": [
+        [
+          {
+            "node": "Kiem tra Whitelist & Lenh",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Kiem tra Whitelist & Lenh": {
+      "main": [
+        [
+          {
+            "node": "Dung Chat ID Chu So Huu?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dung Chat ID Chu So Huu?": {
+      "main": [
+        [
+          {
+            "node": "Chuyen tiep OpenClaw / LLM",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Chuyen tiep OpenClaw / LLM": {
+      "main": [
+        [
+          {
+            "node": "Cat gon Phan hoi Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cat gon Phan hoi Telegram": {
+      "main": [
+        [
+          {
+            "node": "Gui Tra loi Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "vn-ai-vps-stack-pack-03"
+  },
+  "tags": [
+    {
+      "name": "OpenClaw"
+    },
+    {
+      "name": "Telegram"
+    },
+    {
+      "name": "VN-AI-VPS-Stack"
+    }
+  ]
+}

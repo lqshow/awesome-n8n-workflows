@@ -54,6 +54,14 @@ Find up to three timestamped passages in indexed YouTube videos, with source lin
 
 **Tech Stack**: n8n built-in nodes + [Arcmira API](https://arcmira.com/docs). An [Arcmira](https://arcmira.com) account is required; limited free access and paid plans are available. Workflow and documentation retain Apache-2.0.
 
+### [Self-Hosted n8n Webhook Starter Pack](./workflows/self-hosted-webhook-starter-pack/)
+
+Five self-hosted n8n workflows covering payment webhooks, AI SEO brief generation, an OpenClaw Telegram assistant, uptime/SSL/price monitoring, and a confidence-gated RAG support bot. Includes [curl webhook tests and expected JSON outputs](./workflows/self-hosted-webhook-starter-pack/DEMO.md).
+
+**Key Features**: Built-in n8n nodes only, `$env.*` secret hygiene, deterministic JSON webhook responses, Telegram chat ID allowlisting, confidence-gated human escalation
+
+**Tech Stack**: n8n built-in nodes + OpenAI-compatible LLM APIs + Telegram Bot API + Google Sheets + Notion API + OpenClaw Gateway. MIT-licensed upstream stack at [tunguyen1993/vn-ai-vps-stack](https://github.com/tunguyen1993/vn-ai-vps-stack).
+
 ## Contributing
 
 Contributions are welcome! Please ensure your submission includes:
