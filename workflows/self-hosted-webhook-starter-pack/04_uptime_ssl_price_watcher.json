@@ -1,0 +1,204 @@
+{
+  "name": "04 — Website Uptime, SSL Expiry & Price Watcher -> Telegram",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 15
+            }
+          ]
+        }
+      },
+      "id": "node-schedule-15m",
+      "name": "Lich kiem tra moi 15 phut",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        200,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = String($env.WATCH_TARGET_URLS || 'https://example.com,https://n8n.example.com');\nconst targets = raw.split(',').map((u) => u.trim()).filter((u) => u.startsWith('https://') || u.startsWith('http://'));\nconst maxLatencyMs = Number($env.WATCH_MAX_LATENCY_MS || 2500);\nconst pricePattern = String($env.WATCH_PRICE_REGEX || '');\n\nreturn targets.map((url) => ({\n  json: {\n    url,\n    maxLatencyMs,\n    pricePattern,\n    checkedAt: new Date().toISOString(),\n    startedMs: Date.now()\n  }\n}));"
+      },
+      "id": "node-targets-list",
+      "name": "Nap danh sach URL giam sat",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        430,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.url }}",
+        "options": {
+          "response": {
+            "response": {
+              "fullResponse": true,
+              "neverError": true
+            }
+          },
+          "timeout": 12000
+        }
+      },
+      "id": "node-http-probe",
+      "name": "Do HTTP Status & Noi dung",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst srcItems = $('Nap danh sach URL giam sat').all();\nconst results = [];\n\nfor (let i = 0; i < items.length; i++) {\n  const resp = items[i].json || {};\n  const meta = srcItems[i]?.json || {};\n  const statusCode = Number(resp.statusCode || 0);\n  const elapsedMs = Math.max(1, Date.now() - Number(meta.startedMs || Date.now()));\n  const bodyStr = typeof resp.body === 'string' ? resp.body : JSON.stringify(resp.body || '');\n  const reasons = [];\n\n  if (statusCode < 200 || statusCode >= 400) {\n    reasons.push(`HTTP loi (${statusCode || 'TIMEOUT / SSL ERROR'})`);\n  }\n  if (elapsedMs > Number(meta.maxLatencyMs || 2500)) {\n    reasons.push(`Phan hoi cham (${elapsedMs}ms)`);\n  }\n  if (meta.url && meta.url.startsWith('http://')) {\n    reasons.push('Chua bat HTTPS/SSL');\n  }\n  let matchedPrice = '';\n  if (meta.pricePattern) {\n    try {\n      const rx = new RegExp(meta.pricePattern, 'i');\n      const m = bodyStr.match(rx);\n      if (m) matchedPrice = m[0];\n    } catch (_err) {\n      reasons.push('Regex gia khong hop le');\n    }\n  }\n\n  const shouldAlert = reasons.length > 0;\n  results.push({\n    json: {\n      url: meta.url,\n      statusCode,\n      elapsedMs,\n      matchedPrice,\n      shouldAlert,\n      alertText: [\n        'CANH BAO GIAM SAT WEBSITE / SSL / GIA',\n        `URL: ${meta.url}`,\n        `Trang thai: HTTP ${statusCode || 'ERR'} (${elapsedMs}ms)`,\n        `Van de: ${reasons.join('; ')}`,\n        matchedPrice ? `Gia ghi nhan: ${matchedPrice}` : 'Khong cau hinh theo doi gia',\n        `Thoi diem: ${meta.checkedAt}`\n      ].join('\\n')\n    }\n  });\n}\nreturn results;"
+      },
+      "id": "node-eval-health",
+      "name": "Phan tich Downtime / SSL / Gia",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        930,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-alert",
+              "leftValue": "={{ $json.shouldAlert }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "node-if-incident",
+      "name": "Co su co hoac bien dong?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1170,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $env.TELEGRAM_ALERT_CHAT_ID, text: $json.alertText }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "node-tg-uptime",
+      "name": "Gui Canh bao Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1410,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Lich kiem tra moi 15 phut": {
+      "main": [
+        [
+          {
+            "node": "Nap danh sach URL giam sat",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Nap danh sach URL giam sat": {
+      "main": [
+        [
+          {
+            "node": "Do HTTP Status & Noi dung",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Do HTTP Status & Noi dung": {
+      "main": [
+        [
+          {
+            "node": "Phan tich Downtime / SSL / Gia",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Phan tich Downtime / SSL / Gia": {
+      "main": [
+        [
+          {
+            "node": "Co su co hoac bien dong?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Co su co hoac bien dong?": {
+      "main": [
+        [
+          {
+            "node": "Gui Canh bao Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "vn-ai-vps-stack-pack-04"
+  },
+  "tags": [
+    {
+      "name": "Uptime"
+    },
+    {
+      "name": "SSL-Monitor"
+    },
+    {
+      "name": "VN-AI-VPS-Stack"
+    }
+  ]
+}

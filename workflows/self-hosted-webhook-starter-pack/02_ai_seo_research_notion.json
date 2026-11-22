@@ -1,0 +1,251 @@
+{
+  "name": "02 — AI SEO Research Agent (Gemini/DeepSeek API) -> Notion / Sheets",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "ai-seo-brief-vn",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-seo-webhook",
+      "name": "Webhook Nhan Tu Khoa SEO",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "ai-seo-research-vn-02"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json || {};\nconst keyword = String(body.keyword || 'tu dong hoa n8n cho doanh nghiep nho').trim();\nconst audience = String(body.audience || 'Chu shop va ky su van hanh tai Viet Nam').trim();\nconst intent = String(body.intent || 'Commercial Investigation').trim();\n\nconst prompt = [\n  `Ban la chuyen gia SEO ky thuat thi truong Viet Nam. Hay lap SEO Brief chuan E-E-A-T cho tu khoa: \"${keyword}\".`,\n  `Doi tuong doc gia: ${audience}. Search Intent: ${intent}.`,\n  'Tra ve DUY NHAT mot doi tuong JSON hop le voi cac truong:',\n  'title (<=60 ky tu), metaDescription (<=155 ky tu), slug, primaryKeyword, secondaryKeywords (mang 5 tu khoa), outlineH2 (mang 5-7 muc H2 kem goi y H3), faq (mang 4 cau hoi), ctaAngle.'\n].join('\\n');\n\nreturn [{ json: { keyword, audience, intent, prompt } }];"
+      },
+      "id": "node-build-prompt",
+      "name": "Chuan hoa Prompt SEO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        430,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.LLM_API_BASE_URL || 'https://api.deepseek.com/v1') + '/chat/completions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.LLM_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $env.LLM_MODEL || 'deepseek-chat', temperature: 0.3, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'Tra ve JSON hop le bang tieng Viet co dau, khong kem markdown fence.' }, { role: 'user', content: $json.prompt }] }) }}",
+        "options": {
+          "timeout": 45000
+        }
+      },
+      "id": "node-call-llm",
+      "name": "Goi Gemini / DeepSeek API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const raw = $input.first().json.choices?.[0]?.message?.content || '{}';\nconst cleaned = raw.replace(/^```json\\s*/i, '').replace(/```$/i, '').trim();\nlet brief = {};\ntry {\n  brief = JSON.parse(cleaned);\n} catch (err) {\n  brief = { title: 'SEO Brief (Can kiem tra lai JSON)', metaDescription: cleaned.slice(0, 155), outlineH2: [], faq: [] };\n}\nconst src = $('Chuan hoa Prompt SEO').first().json;\nreturn [{\n  json: {\n    keyword: src.keyword,\n    intent: src.intent,\n    title: String(brief.title || src.keyword),\n    metaDescription: String(brief.metaDescription || ''),\n    slug: String(brief.slug || ''),\n    secondaryKeywords: Array.isArray(brief.secondaryKeywords) ? brief.secondaryKeywords.join(', ') : '',\n    outlineText: Array.isArray(brief.outlineH2) ? brief.outlineH2.map((h, i) => `${i + 1}. ${typeof h === 'string' ? h : JSON.stringify(h)}`).join('\\n') : '',\n    faqCount: Array.isArray(brief.faq) ? brief.faq.length : 0,\n    createdAt: new Date().toISOString()\n  }\n}];"
+      },
+      "id": "node-parse-brief",
+      "name": "Tach JSON Dan Y SEO",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        920,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.notion.com/v1/pages",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.NOTION_API_KEY }}"
+            },
+            {
+              "name": "Notion-Version",
+              "value": "2022-06-28"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ parent: { database_id: $env.NOTION_DATABASE_ID }, properties: { Name: { title: [{ text: { content: $json.title } }] }, Keyword: { rich_text: [{ text: { content: $json.keyword } }] }, Intent: { rich_text: [{ text: { content: $json.intent } }] } }, children: [{ object: 'block', type: 'paragraph', paragraph: { rich_text: [{ type: 'text', text: { content: 'Meta: ' + $json.metaDescription + '\\n\\nDan y H2:\\n' + $json.outlineText } }] } }] }) }}",
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "node-notion-create",
+      "name": "Tao Trang Brief Notion",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1170,
+        180
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "={{ $env.GOOGLE_SHEET_ID || 'REPLACE_GOOGLE_SHEET_ID' }}",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "SEO_Content_Pipeline",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "CreatedAt": "={{ $json.createdAt }}",
+            "Keyword": "={{ $json.keyword }}",
+            "Title": "={{ $json.title }}",
+            "MetaDescription": "={{ $json.metaDescription }}",
+            "SecondaryKeywords": "={{ $json.secondaryKeywords }}"
+          }
+        }
+      },
+      "id": "node-sheets-seo",
+      "name": "Luu Lich Dang Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        1170,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, keyword: $('Tach JSON Dan Y SEO').first().json.keyword, title: $('Tach JSON Dan Y SEO').first().json.title }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-seo-respond",
+      "name": "Tra Ket Qua Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1420,
+        290
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Nhan Tu Khoa SEO": {
+      "main": [
+        [
+          {
+            "node": "Chuan hoa Prompt SEO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chuan hoa Prompt SEO": {
+      "main": [
+        [
+          {
+            "node": "Goi Gemini / DeepSeek API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Goi Gemini / DeepSeek API": {
+      "main": [
+        [
+          {
+            "node": "Tach JSON Dan Y SEO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tach JSON Dan Y SEO": {
+      "main": [
+        [
+          {
+            "node": "Tao Trang Brief Notion",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Luu Lich Dang Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tao Trang Brief Notion": {
+      "main": [
+        [
+          {
+            "node": "Tra Ket Qua Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "vn-ai-vps-stack-pack-02"
+  },
+  "tags": [
+    {
+      "name": "SEO-AI"
+    },
+    {
+      "name": "Notion"
+    },
+    {
+      "name": "VN-AI-VPS-Stack"
+    }
+  ]
+}

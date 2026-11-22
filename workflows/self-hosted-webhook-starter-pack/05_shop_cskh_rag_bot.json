@@ -1,0 +1,295 @@
+{
+  "name": "05 — AI CSKH RAG Auto-Reply Bot (Webhook -> FAQ -> Telegram Escalation)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "shop-cskh-rag-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "node-cskh-webhook",
+      "name": "Webhook Tin Nhan Khach Hang",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        200,
+        300
+      ],
+      "webhookId": "shop-cskh-rag-vn-05"
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.FAQ_API_ENDPOINT || 'https://api.example.com/faq.json' }}",
+        "options": {
+          "timeout": 8000,
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          }
+        }
+      },
+      "id": "node-fetch-faq",
+      "name": "Tai Kho FAQ / Chinh Sach Shop",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        440,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const webhookData = $('Webhook Tin Nhan Khach Hang').first().json;\nconst body = webhookData.body || webhookData || {};\nconst customerName = String(body.customerName || 'Khach hang').trim();\nconst customerId = String(body.customerId || body.phone || 'unknown').trim();\nconst question = String(body.message || '').trim();\nconst faqRaw = $input.first().json;\nconst faqList = Array.isArray(faqRaw) ? faqRaw : (Array.isArray(faqRaw.items) ? faqRaw.items : []);\n\nconst tokens = question.toLowerCase().split(/\\s+/).filter((t) => t.length >= 2);\nconst scored = faqList.map((entry) => {\n  const hay = `${entry.q || entry.question || ''} ${entry.a || entry.answer || ''}`.toLowerCase();\n  let score = 0;\n  for (const tk of tokens) {\n    if (hay.includes(tk)) score += 1;\n  }\n  return { entry, score };\n}).sort((a, b) => b.score - a.score).slice(0, 4);\n\nconst context = scored.map((s, idx) => `FAQ #${idx + 1}: H: ${s.entry.q || s.entry.question || ''} | D: ${s.entry.a || s.entry.answer || ''}`).join('\\n');\nconst hasComplaint = /(khieu nai|lua dao|hoan tien|bao hanh loi|gap nhan vien|goi dien)/i.test(question);\n\nreturn [{\n  json: {\n    customerName,\n    customerId,\n    question,\n    hasComplaint,\n    context: context || 'Khong tim thay muc FAQ khop truc tiep.'\n  }\n}];"
+      },
+      "id": "node-rag-rank",
+      "name": "Loc Top FAQ & Phat hien Khieu nai",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.LLM_API_BASE_URL || 'https://api.deepseek.com/v1') + '/chat/completions' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "=Bearer {{ $env.LLM_API_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: $env.LLM_MODEL || 'deepseek-chat', temperature: 0.2, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: 'Ban la tro ly CSKH lich su bang tieng Viet. Chi tra loi dua tren FAQ duoc cung cap, khong bia dat gia hay chinh sach. Tra ve JSON gom: reply (string), confidence (so tu 0 den 1), needHuman (boolean).' }, { role: 'user', content: 'Ngu canh FAQ:\\n' + $json.context + '\\n\\nCau hoi cua khach (' + $json.customerName + '): ' + $json.question }] }) }}",
+        "options": {
+          "timeout": 25000
+        }
+      },
+      "id": "node-cskh-llm",
+      "name": "Sinh Cau Tra Loi RAG",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        920,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const src = $('Loc Top FAQ & Phat hien Khieu nai').first().json;\nconst raw = $input.first().json.choices?.[0]?.message?.content || '{}';\nlet parsed = { reply: '', confidence: 0, needHuman: true };\ntry {\n  parsed = JSON.parse(raw);\n} catch (_err) {\n  parsed = { reply: '', confidence: 0, needHuman: true };\n}\nconst confidence = Number(parsed.confidence || 0);\nconst autoReplyOk = !src.hasComplaint && !parsed.needHuman && confidence >= 0.75 && String(parsed.reply || '').trim().length > 0;\n\nreturn [{\n  json: {\n    customerName: src.customerName,\n    customerId: src.customerId,\n    question: src.question,\n    confidence,\n    autoReplyOk,\n    reply: autoReplyOk\n      ? String(parsed.reply).trim()\n      : 'Cam on ban da lien he! Yeu cau cua ban da duoc chuyen ngay cho nhan vien CSKH de ho tro chinh xac nhat trong it phut.',\n    escalationText: [\n      'CAN NHAN VIEN CSKH HO TRO GAP',\n      `Khach: ${src.customerName} (${src.customerId})`,\n      `Cau hoi: ${src.question}`,\n      `Do tin cay AI: ${confidence} | Khieu nai: ${src.hasComplaint ? 'CO' : 'KHONG'}`\n    ].join('\\n')\n  }\n}];"
+      },
+      "id": "node-confidence-gate",
+      "name": "Cong Kiem duyet Do tin cay",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1160,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "cond-auto",
+              "leftValue": "={{ $json.autoReplyOk }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "node-if-autoreply",
+      "name": "Tu dong tra loi hay Chuyen CSKH?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1400,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ mode: 'auto_rag', confidence: $json.confidence, reply: $json.reply }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-respond-auto",
+      "name": "Tra loi Khach Tu dong",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1660,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://api.telegram.org/bot{{ $env.TELEGRAM_BOT_TOKEN }}/sendMessage",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ chat_id: $env.CSKH_TELEGRAM_GROUP_ID, text: $json.escalationText }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "node-escalate-tg",
+      "name": "Chuyen Nhom CSKH Telegram",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1660,
+        400
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ mode: 'escalated_human', confidence: $('Cong Kiem duyet Do tin cay').first().json.confidence, reply: $('Cong Kiem duyet Do tin cay').first().json.reply }) }}",
+        "options": {
+          "responseCode": 200
+        }
+      },
+      "id": "node-respond-escalated",
+      "name": "Bao Khach Da Ket Noi CSKH",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1910,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook Tin Nhan Khach Hang": {
+      "main": [
+        [
+          {
+            "node": "Tai Kho FAQ / Chinh Sach Shop",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tai Kho FAQ / Chinh Sach Shop": {
+      "main": [
+        [
+          {
+            "node": "Loc Top FAQ & Phat hien Khieu nai",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loc Top FAQ & Phat hien Khieu nai": {
+      "main": [
+        [
+          {
+            "node": "Sinh Cau Tra Loi RAG",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sinh Cau Tra Loi RAG": {
+      "main": [
+        [
+          {
+            "node": "Cong Kiem duyet Do tin cay",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cong Kiem duyet Do tin cay": {
+      "main": [
+        [
+          {
+            "node": "Tu dong tra loi hay Chuyen CSKH?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tu dong tra loi hay Chuyen CSKH?": {
+      "main": [
+        [
+          {
+            "node": "Tra loi Khach Tu dong",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Chuyen Nhom CSKH Telegram",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Chuyen Nhom CSKH Telegram": {
+      "main": [
+        [
+          {
+            "node": "Bao Khach Da Ket Noi CSKH",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "instanceId": "vn-ai-vps-stack-pack-05"
+  },
+  "tags": [
+    {
+      "name": "CSKH-RAG"
+    },
+    {
+      "name": "Telegram"
+    },
+    {
+      "name": "VN-AI-VPS-Stack"
+    }
+  ]
+}
