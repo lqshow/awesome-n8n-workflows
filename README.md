@@ -62,6 +62,11 @@ Five self-hosted n8n workflows covering payment webhooks, AI SEO brief generatio
 
 **Tech Stack**: n8n built-in nodes + OpenAI-compatible LLM APIs + Telegram Bot API + Google Sheets + Notion API + OpenClaw Gateway. MIT-licensed upstream stack at [tunguyen1993/vn-ai-vps-stack](https://github.com/tunguyen1993/vn-ai-vps-stack).
 
+
+## Public Data APIs (Apify)
+
+- [Public Records data workflows](https://github.com/GeminiGeorge22/publicrecords-mcp/tree/main/templates) - 17 ready-to-import n8n workflows (plus Make/Zapier/Pipedream HTTP recipes) that pull public data via Apify: SAM.gov and Grants.gov notices, USAspending awards, EU TED and UK tenders, city council agendas, Ashby/Greenhouse/Lever/SmartRecruiters jobs, Etsy sales, Google Ads Transparency, sports odds, Spotify plays.
+
 ## Contributing
 
 Contributions are welcome! Please ensure your submission includes:
