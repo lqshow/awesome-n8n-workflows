@@ -1,0 +1,404 @@
+{
+  "name": "Decode Google News RSS Real Publisher URLs for AI RAG (Zero-Key)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Google News Real-Publisher URL Decoder for AI RAG (Zero-Key)\n\nFixes `news.google.com/rss/articles/CBMi...` (`AU_yqL...`) wrapper links in AI RAG pipelines using built-in n8n nodes only:\n1. Checks legacy plaintext protobuf `CBMi` tokens offline (0 extra HTTP calls).\n2. For modern `AU_yqL` tokens, fetches `data-n-a-sg` & `data-n-a-ts` and posts `Fbv4je` to `DotsSplashUi/data/batchexecute` to resolve the canonical publisher URL.\n\n### Optional CLI / MCP / Cloud Batch Options (MIT)\n- **Standalone Node 18+ CLI:** https://github.com/truonggiang0111/google-news-url-decoder\n- **Python 3.10+ Stdlib CLI/SDK:** https://github.com/truonggiang0111/b2b-market-intel-python\n- **STDIO MCP Server:** `npx -y github:truonggiang0111/b2b-market-intel-mcp`\n- **Free Agensi RAG Skill:** https://www.agensi.io/skills/google-news-real-url-decoder-for-ai-rag\n- **Cloud Batch (50–500 URLs + Markdown, $5/mo free tier):** https://apify.com/ttyan0111/google-news-ai-article-extractor",
+        "height": 340,
+        "width": 660,
+        "color": 4
+      },
+      "id": "03fe2f36-4ac7-34e9-1839-1710053ee5d6",
+      "name": "Workflow Guide & Attribution",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        100,
+        -160
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "b796222b-f889-8f85-d294-e3d64111940f",
+      "name": "Test Workflow Manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        120,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "90bfd541-056a-91f2-de8b-afb8bbe4416e",
+      "name": "Daily Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        120,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Configure Google News RSS query (zero API keys required)\nconst query = 'AI agents';\nconst maxItems = 5;\nconst rssUrl = `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=en-US&gl=US&ceid=US:en`;\n\nreturn [{ json: { query, maxItems, rssUrl } }];"
+      },
+      "id": "fa10706a-1fdc-7342-b7c7-ca8c40f82f81",
+      "name": "Configure News Topic",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        380,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.rssUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text"
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "a49f836c-b3ec-5d2d-607a-4146e4be8760",
+      "name": "Fetch Google News RSS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse Google News RSS items and inspect CBMi protobuf tokens offline first\nconst cfg = $('Configure News Topic').first().json;\nconst maxItems = Number(cfg.maxItems || 5);\nconst xml = String($input.first().json.data ?? $input.first().json.body ?? '');\n\nfunction extractToken(rawUrl) {\n  const m = String(rawUrl || '').match(/news\\.google\\.com\\/(?:rss\\/)?(?:articles|read)\\/([A-Za-z0-9_-]+)/);\n  return m ? m[1] : null;\n}\n\nfunction tryLegacyDecode(token) {\n  if (!token) return null;\n  const b64 = token.replace(/-/g, '+').replace(/_/g, '/') + '='.repeat((4 - (token.length % 4)) % 4);\n  const buf = Buffer.from(b64, 'base64');\n  const txt = buf.toString('latin1');\n  if (txt.includes('AU_yqL')) return null;\n  const hit = txt.match(/https?:\\/\\/[^\\x00-\\x1f\\x7f-\\xff\"<>\\s]+/);\n  return hit ? hit[0] : null;\n}\n\nconst out = [];\nfor (const m of xml.matchAll(/<item>([\\s\\S]*?)<\\/item>/g)) {\n  if (out.length >= maxItems) break;\n  const block = m[1];\n  const getTag = (tag) => {\n    const hit = block.match(new RegExp(`<${tag}[^>]*>([\\\\s\\\\S]*?)<\\\\/${tag}>`, 'i'));\n    return hit ? hit[1].replace(/<!\\[CDATA\\[|\\]\\]>/g, '').trim() : '';\n  };\n  const gnewsLink = getTag('link');\n  const token = extractToken(gnewsLink);\n  const legacyUrl = tryLegacyDecode(token);\n  out.push({\n    json: {\n      title: getTag('title'),\n      pubDate: getTag('pubDate'),\n      source: getTag('source'),\n      gnewsLink,\n      token,\n      splashUrl: token ? `https://news.google.com/articles/${token}` : gnewsLink,\n      decodedUrl: legacyUrl,\n      needsLiveExchange: Boolean(token && !legacyUrl),\n      method: legacyUrl ? 'legacy-protobuf-base64' : 'pending-Fbv4je',\n    },\n  });\n}\n\nreturn out.length ? out : [{ json: { status: 'no_rss_items', needsLiveExchange: false } }];"
+      },
+      "id": "67aea429-e0c1-2dba-faf0-9601947237e6",
+      "name": "Parse RSS & Offline Protobuf Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "87e3eb1e-c35f-2d64-d93b-480bf9e1606c",
+              "leftValue": "={{ $json.needsLiveExchange }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "e87ae052-45ea-391e-91f5-c15836a9fd81",
+      "name": "Needs Live Fbv4je Exchange?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1160,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.splashUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+            },
+            {
+              "name": "Accept-Language",
+              "value": "en-US,en;q=0.9"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1000
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "d60288a8-bcfb-37d6-3602-ed71b0ce37f4",
+      "name": "Fetch DotsSplashUi HTML",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1420,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract data-n-a-sg and data-n-a-ts from DotsSplashUi HTML and prepare Fbv4je RPC\nconst splashItems = $input.all();\nconst upstreamItems = $('Needs Live Fbv4je Exchange?').all();\nconst out = [];\n\nfor (let i = 0; i < splashItems.length; i++) {\n  const html = String(splashItems[i].json.data ?? splashItems[i].json.body ?? '');\n  const meta = (upstreamItems[i] && upstreamItems[i].json) ? upstreamItems[i].json : {};\n  const sg = (html.match(/data-n-a-sg=\"([^\"]+)\"/) || [])[1] || '';\n  const ts = (html.match(/data-n-a-ts=\"([^\"]+)\"/) || [])[1] || '';\n\n  if (!sg || !ts || !meta.token) {\n    out.push({\n      json: {\n        ...meta,\n        fReq: '',\n        canCallFbv4je: false,\n        method: 'fallback-missing-splash-params',\n      },\n    });\n    continue;\n  }\n\n  const inner = [\n    'garturlreq',\n    [['X', 'X', ['X', 'X'], null, null, 1, 1, 'US:en', null, 1, null, null, null, null, null, 0, 1], 'X', 'X', 1, [1, 1, 1], 1, 1, null, 0, 0, null, 0],\n    meta.token,\n    Number(ts),\n    sg,\n  ];\n  const fReq = JSON.stringify([[['Fbv4je', JSON.stringify(inner), null, 'generic']]]);\n  out.push({\n    json: {\n      ...meta,\n      fReq,\n      canCallFbv4je: true,\n    },\n  });\n}\nreturn out;"
+      },
+      "id": "ce96c0ca-f5dc-941e-09f5-2259dbd33a85",
+      "name": "Build Fbv4je Signature Payload",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1680,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://news.google.com/_/DotsSplashUi/data/batchexecute?rpcids=Fbv4je",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Referer",
+              "value": "https://news.google.com/"
+            },
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "form-urlencoded",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "f.req",
+              "value": "={{ $json.fReq }}"
+            }
+          ]
+        },
+        "options": {
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1200
+            }
+          },
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "2096128f-2cdb-d079-ea00-4ce841d28dca",
+      "name": "POST batchexecute Fbv4je",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1940,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse garturlres canonical publisher URL from Google DotsSplashUi Fbv4je response\nconst rpcItems = $input.all();\nconst reqMeta = $('Build Fbv4je Signature Payload').all();\n\nreturn rpcItems.map((item, idx) => {\n  const raw = String(item.json.data ?? item.json.body ?? '');\n  const meta = (reqMeta[idx] && reqMeta[idx].json) ? reqMeta[idx].json : {};\n  const match = raw.match(/\\[\\s*\\\\\"garturlres\\\\\"\\s*,\\s*\\\\\"(https?:[^\"\\\\]+)\\\\\"/);\n  let decodedUrl = meta.decodedUrl || meta.gnewsLink || null;\n  let method = meta.method || 'fallback';\n\n  if (match && match[1]) {\n    try {\n      decodedUrl = JSON.parse(`\"${match[1]}\"`);\n      method = 'batchexecute-Fbv4je';\n    } catch {\n      decodedUrl = match[1];\n      method = 'batchexecute-Fbv4je-raw';\n    }\n  }\n\n  return {\n    json: {\n      title: meta.title || '',\n      source: meta.source || '',\n      pubDate: meta.pubDate || '',\n      gnewsLink: meta.gnewsLink || '',\n      decodedUrl,\n      method,\n    },\n  };\n});"
+      },
+      "id": "ad7d384a-3385-fa0f-b8e4-ac26d2ed2fcd",
+      "name": "Extract Canonical Publisher URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2200,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "return $input.all().map((item) => ({\n  json: {\n    title: item.json.title || '',\n    source: item.json.source || '',\n    pubDate: item.json.pubDate || '',\n    gnewsLink: item.json.gnewsLink || '',\n    decodedUrl: item.json.decodedUrl || item.json.gnewsLink || null,\n    method: item.json.method || 'legacy-protobuf-base64',\n  },\n}));"
+      },
+      "id": "fc8d260e-9779-2a8e-d761-3a20511922fc",
+      "name": "Output Legacy Protobuf URL",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        440
+      ]
+    }
+  ],
+  "connections": {
+    "Test Workflow Manually": {
+      "main": [
+        [
+          {
+            "node": "Configure News Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configure News Topic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configure News Topic": {
+      "main": [
+        [
+          {
+            "node": "Fetch Google News RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Google News RSS": {
+      "main": [
+        [
+          {
+            "node": "Parse RSS & Offline Protobuf Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse RSS & Offline Protobuf Check": {
+      "main": [
+        [
+          {
+            "node": "Needs Live Fbv4je Exchange?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Needs Live Fbv4je Exchange?": {
+      "main": [
+        [
+          {
+            "node": "Fetch DotsSplashUi HTML",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Output Legacy Protobuf URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch DotsSplashUi HTML": {
+      "main": [
+        [
+          {
+            "node": "Build Fbv4je Signature Payload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build Fbv4je Signature Payload": {
+      "main": [
+        [
+          {
+            "node": "POST batchexecute Fbv4je",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "POST batchexecute Fbv4je": {
+      "main": [
+        [
+          {
+            "node": "Extract Canonical Publisher URL",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b2b-market-intel-google-news-rag"
+  },
+  "tags": [
+    {
+      "name": "ai-rag"
+    },
+    {
+      "name": "google-news"
+    },
+    {
+      "name": "zero-key"
+    }
+  ]
+}

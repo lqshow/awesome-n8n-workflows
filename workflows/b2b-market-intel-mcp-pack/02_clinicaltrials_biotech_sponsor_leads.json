@@ -1,0 +1,174 @@
+{
+  "name": "ClinicalTrials.gov Biotech Sponsor & Contact Leads (Zero-Key)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## ClinicalTrials.gov Biotech & Pharma Sponsor Leads (Zero-Key)\n\nQueries the official **ClinicalTrials.gov REST API v2** (`clinicaltrials.gov/api/v2/studies`) for actively recruiting Industry-sponsored biotech/pharma clinical trials with zero API keys.\n\n### Optional Scale & AI / MCP Integrations (MIT)\n- **STDIO MCP Server:** `npx -y github:truonggiang0111/b2b-market-intel-mcp` (`preview_clinical_trials_leads`)\n- **Python 3.10+ Stdlib SDK:** https://github.com/truonggiang0111/b2b-market-intel-python\n- **Hosted Skill:** https://www.agensi.io/skills/clinicaltrials-gov-biotech-pi-email-leads\n- **Cloud Batch ($5/mo free tier):** https://apify.com/ttyan0111",
+        "height": 320,
+        "width": 620,
+        "color": 4
+      },
+      "id": "46324551-3ab5-f930-d934-eb08580e2ac3",
+      "name": "Workflow Guide & Attribution",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        100,
+        -140
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "00abe622-f363-94eb-5b6e-c71b128a899f",
+      "name": "Test Workflow Manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        120,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "dd06a8f1-6cee-897e-82b4-c534afa432d9",
+      "name": "Daily Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        120,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Configure ClinicalTrials.gov REST API v2 query (zero API keys required)\nconst condition = 'oncology';\nconst status = 'RECRUITING';\nconst sponsorClass = 'INDUSTRY'; // INDUSTRY | NIH | OTHER\nconst pageSize = 10;\nconst requestUrl = `https://clinicaltrials.gov/api/v2/studies?query.cond=${encodeURIComponent(condition)}&filter.overallStatus=${encodeURIComponent(status)}&filter.advanced=${encodeURIComponent('AREA[LeadSponsorClass]' + sponsorClass)}&pageSize=${pageSize}`;\n\nreturn [{\n  json: { condition, status, sponsorClass, pageSize, requestUrl },\n}];"
+      },
+      "id": "5c35bfc9-8f5d-ad1a-2a46-769fbcc0a2f5",
+      "name": "Configure Biotech Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        380,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.requestUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-b2b-market-intel/1.0"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "81ed0abe-8fde-496f-1d37-de979e564f8a",
+      "name": "Fetch ClinicalTrials v2 API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Normalize ClinicalTrials.gov REST v2 recruiting studies into biotech sponsor leads\nconst payload = $input.first().json || {};\nconst studies = Array.isArray(payload.studies) ? payload.studies : [];\nconst out = [];\n\nfor (const study of studies) {\n  const ps = study.protocolSection || {};\n  const ident = ps.identificationModule || {};\n  const statusMod = ps.statusModule || {};\n  const sponsor = (ps.sponsorCollaboratorsModule || {}).leadSponsor || {};\n  const design = ps.designModule || {};\n  const contacts = ps.contactsLocationsModule || {};\n  const central = Array.isArray(contacts.centralContacts) ? contacts.centralContacts : [];\n  const locations = Array.isArray(contacts.locations) ? contacts.locations : [];\n  const primaryContact = central.find((c) => c && c.email) || central[0] || {};\n  const nctId = ident.nctId || null;\n\n  out.push({\n    json: {\n      nctId,\n      briefTitle: ident.briefTitle || '',\n      sponsorName: sponsor.name || '',\n      sponsorClass: sponsor.class || '',\n      phases: Array.isArray(design.phases) ? design.phases : [],\n      enrollment: (design.enrollmentInfo || {}).count ?? null,\n      overallStatus: statusMod.overallStatus || '',\n      centralContactsCount: central.length,\n      locationsCount: locations.length,\n      primaryContactName: primaryContact.name || null,\n      primaryContactEmail: primaryContact.email || null,\n      primaryContactPhone: primaryContact.phone || null,\n      studyUrl: nctId ? `https://clinicaltrials.gov/study/${nctId}` : null,\n      agentSummary: `${nctId}: ${sponsor.name || 'Unknown'} (${(design.phases || []).join('/') || 'N/A'}) — ${ident.briefTitle || ''}${primaryContact.email ? ' | ' + primaryContact.email : ''}`,\n    },\n  });\n}\n\nreturn out.length ? out : [{ json: { status: 'no_studies_found' } }];"
+      },
+      "id": "1d29bcbc-59f9-5459-a2f7-b56dad8f6984",
+      "name": "Extract Sponsor & Site Leads",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        340
+      ]
+    }
+  ],
+  "connections": {
+    "Test Workflow Manually": {
+      "main": [
+        [
+          {
+            "node": "Configure Biotech Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configure Biotech Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configure Biotech Query": {
+      "main": [
+        [
+          {
+            "node": "Fetch ClinicalTrials v2 API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch ClinicalTrials v2 API": {
+      "main": [
+        [
+          {
+            "node": "Extract Sponsor & Site Leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b2b-market-intel-clinical-trials"
+  },
+  "tags": [
+    {
+      "name": "biotech"
+    },
+    {
+      "name": "b2b-leads"
+    },
+    {
+      "name": "zero-key"
+    }
+  ]
+}

@@ -62,6 +62,14 @@ Five self-hosted n8n workflows covering payment webhooks, AI SEO brief generatio
 
 **Tech Stack**: n8n built-in nodes + OpenAI-compatible LLM APIs + Telegram Bot API + Google Sheets + Notion API + OpenClaw Gateway. MIT-licensed upstream stack at [tunguyen1993/vn-ai-vps-stack](https://github.com/tunguyen1993/vn-ai-vps-stack).
 
+### [B2B Market Intel & AI RAG Starter Pack](./workflows/b2b-market-intel-mcp-pack/)
+
+Five zero-key n8n workflows built exclusively with built-in n8n nodes (`manualTrigger`, `scheduleTrigger`, `httpRequest`, `code`, `if`, `stickyNote`) querying live public APIs: UK Contracts Finder OCDS tenders, ClinicalTrials.gov v2 biotech sponsor leads, WooCommerce/WordPress 1-star churn RSS, Google News `CBMi`/`AU_yqL` real-publisher URL decoding (`Fbv4je`), and Open-VSX Cursor/Windsurf extension bug reviews. Includes [verified live curl checks and outputs](./workflows/b2b-market-intel-mcp-pack/DEMO.md).
+
+**Key Features**: Zero API keys required, built-in n8n nodes only, MIT-licensed workflows & documentation, optional MCP/Python SDK/Apify scale-up notes
+
+**Tech Stack**: Built-in n8n nodes + Contracts Finder OCDS + ClinicalTrials.gov v2 + WordPress.org API/RSS + Google News `Fbv4je` + Open-VSX API (MIT license; optional [b2b-market-intel-mcp](https://github.com/truonggiang0111/b2b-market-intel-mcp) & [b2b-market-intel-python](https://github.com/truonggiang0111/b2b-market-intel-python)).
+
 ## Contributing
 
 Contributions are welcome! Please ensure your submission includes:

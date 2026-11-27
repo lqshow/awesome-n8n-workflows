@@ -1,0 +1,174 @@
+{
+  "name": "UK Gov Contracts Finder B2B Buyer Tenders (Zero-Key)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## UK Gov Contracts Finder B2B Buyer Tenders (Zero-Key)\n\nQueries the official GOV.UK **Contracts Finder OCDS API** (`contractsfinder.service.gov.uk`) under Open Government Licence v3.0 with **zero API keys** or credentials.\n\n### What it outputs\n- `buyerName`, `buyerContact`, `buyerEmail` (`.gov.uk` / NHS / council), `valueGbp`, `deadline`, `noticeUrl`, and a compact `agentSummary`.\n\n### Optional Scale & AI / MCP Integrations (MIT)\n- **STDIO MCP Server:** `npx -y github:truonggiang0111/b2b-market-intel-mcp`\n- **Python 3.10+ Stdlib SDK:** https://github.com/truonggiang0111/b2b-market-intel-python\n- **Hosted Skill / Docs:** https://www.agensi.io/skills/uk-gov-tenders-direct-buyer-emails\n- **Cloud Batch ($5/mo free tier):** https://apify.com/ttyan0111",
+        "height": 340,
+        "width": 620,
+        "color": 4
+      },
+      "id": "df7c0e69-a106-6622-7dfe-5ad038d26a1d",
+      "name": "Workflow Guide & Attribution",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        100,
+        -140
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a18023ed-8acd-d591-0cf4-ed4cb206c39c",
+      "name": "Test Workflow Manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        120,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "0e2f87da-34a2-c82f-06bf-71a2748f0850",
+      "name": "Daily Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        120,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Configure search window & optional keyword filter (zero API keys required)\nconst daysBack = 14;\nconst since = new Date(Date.now() - daysBack * 86400000).toISOString().slice(0, 19) + 'Z';\nconst limit = 25;\nconst keywordFilter = ''; // Optional substring filter e.g. 'software' or 'cloud'\nconst requestUrl = `https://www.contractsfinder.service.gov.uk/Published/Notices/OCDS/Search?publishedFrom=${encodeURIComponent(since)}&stages=tender,award&limit=${limit}`;\n\nreturn [{\n  json: {\n    since,\n    limit,\n    keywordFilter,\n    requestUrl,\n  },\n}];"
+      },
+      "id": "98d84032-4d56-15d3-074a-f0d226a458a7",
+      "name": "Configure Tender Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        380,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.requestUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-b2b-market-intel/1.0"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "79e0bb15-d5b6-6004-ec27-2d559627c8c7",
+      "name": "Fetch Contracts Finder OCDS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse official Contracts Finder OCDS releases into B2B buyer leads\nconst cfg = $('Configure Tender Query').first().json;\nconst kw = String(cfg.keywordFilter || '').trim().toLowerCase();\nconst payload = $input.first().json || {};\nconst releases = Array.isArray(payload.releases) ? payload.releases : [];\nconst uuidRe = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;\n\nconst out = [];\nfor (const rel of releases) {\n  const tender = rel.tender || {};\n  const title = String(tender.title || '').trim();\n  const description = String(tender.description || '').trim();\n  if (kw && !title.toLowerCase().includes(kw) && !description.toLowerCase().includes(kw)) {\n    continue;\n  }\n  const parties = Array.isArray(rel.parties) ? rel.parties : [];\n  const buyer = parties.find((p) => Array.isArray(p.roles) && (p.roles.includes('buyer') || p.roles.includes('procuringEntity'))) || parties[0] || {};\n  const contact = buyer.contactPoint || {};\n  const addr = buyer.address || {};\n  const val = tender.value || tender.minValue || {};\n  const rawId = String(rel.id || '');\n  const uuidCandidate = rawId.includes('-') ? rawId.replace(/-[^-]+$/, '') : rawId;\n  const noticeUrl = uuidRe.test(uuidCandidate)\n    ? `https://www.contractsfinder.service.gov.uk/Notice/${uuidCandidate}`\n    : 'https://www.contractsfinder.service.gov.uk/';\n\n  const valueGbp = typeof val.amount === 'number' ? val.amount : null;\n  const deadline = String((tender.tenderPeriod || {}).endDate || '').slice(0, 10) || null;\n  const buyerName = String(buyer.name || (rel.buyer || {}).name || '').trim();\n  const buyerEmail = contact.email ? String(contact.email).trim() : null;\n\n  out.push({\n    json: {\n      ocid: rel.ocid || null,\n      title,\n      buyerName,\n      buyerContact: contact.name ? String(contact.name).trim() : null,\n      buyerEmail,\n      buyerPhone: contact.telephone ? String(contact.telephone).trim() : null,\n      locality: addr.locality || addr.region || null,\n      valueGbp,\n      currency: val.currency || 'GBP',\n      deadline,\n      stage: tender.status || 'published',\n      publishedDate: String(rel.date || '').slice(0, 10),\n      noticeUrl,\n      agentSummary: `${title} | Buyer: ${buyerName}${buyerEmail ? ' (' + buyerEmail + ')' : ''}${valueGbp ? ' | £' + valueGbp.toLocaleString('en-US') : ''}${deadline ? ' | Due ' + deadline : ''}`,\n    },\n  });\n}\n\nreturn out.length ? out : [{ json: { status: 'no_matching_tenders', since: cfg.since } }];"
+      },
+      "id": "af900638-ba95-aa4a-77cb-ac70e885b844",
+      "name": "Extract Buyer Contacts & GBP Values",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        340
+      ]
+    }
+  ],
+  "connections": {
+    "Test Workflow Manually": {
+      "main": [
+        [
+          {
+            "node": "Configure Tender Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configure Tender Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configure Tender Query": {
+      "main": [
+        [
+          {
+            "node": "Fetch Contracts Finder OCDS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Contracts Finder OCDS": {
+      "main": [
+        [
+          {
+            "node": "Extract Buyer Contacts & GBP Values",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b2b-market-intel-uk-gov-tenders"
+  },
+  "tags": [
+    {
+      "name": "b2b-leads"
+    },
+    {
+      "name": "govtech"
+    },
+    {
+      "name": "zero-key"
+    }
+  ]
+}

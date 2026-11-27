@@ -1,0 +1,241 @@
+{
+  "name": "WooCommerce & WordPress Plugin 1-Star Churn Monitor (Zero-Key)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## WooCommerce & WordPress Plugin 1-Star Churn Monitor (Zero-Key)\n\nQueries the official **WordPress.org Plugins API v1.2** (`api.wordpress.org`) plus live **1-star review RSS feeds** (`?filter=1`) to surface high-install plugins leaking dissatisfied users (pricing/billing friction, update breakage, unresolved support tickets).\n\n### Optional Scale & AI / MCP Integrations (MIT)\n- **Hosted Agent Skill:** https://www.agensi.io/skills/wordpress-woocommerce-plugin-churn-spy\n- **STDIO MCP Server:** `npx -y github:truonggiang0111/b2b-market-intel-mcp`\n- **Python 3.10+ SDK:** https://github.com/truonggiang0111/b2b-market-intel-python\n- **Cloud Batch ($5/mo free tier):** https://apify.com/ttyan0111",
+        "height": 320,
+        "width": 620,
+        "color": 4
+      },
+      "id": "d42505b1-8f46-8d09-85a9-5ab87eaa6236",
+      "name": "Workflow Guide & Attribution",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        100,
+        -140
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "b11daecc-faec-b8f1-e046-e318c02fb92e",
+      "name": "Test Workflow Manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        120,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "275cb7e0-13e7-017b-80e8-e1458d82ef7a",
+      "name": "Daily Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        120,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Configure WordPress.org plugin directory search (zero API keys required)\nconst search = 'woocommerce';\nconst perPage = 5;\nconst requestUrl = `https://api.wordpress.org/plugins/info/1.2/?action=query_plugins&request%5Bsearch%5D=${encodeURIComponent(search)}&request%5Bper_page%5D=${perPage}`;\n\nreturn [{ json: { search, perPage, requestUrl } }];"
+      },
+      "id": "a8dc54d8-18b5-08ec-d258-7116309f8fee",
+      "name": "Configure Plugin Search",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        380,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.requestUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-b2b-market-intel/1.0"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "e081e251-9ecd-bef4-6b5a-41825963dc4c",
+      "name": "Fetch WordPress Plugins API",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Rank plugins by 1-2 star churn density and prepare 1-star RSS review URLs\nconst payload = $input.first().json || {};\nconst plugins = Array.isArray(payload.plugins) ? payload.plugins : [];\n\nconst scored = plugins.map((p) => {\n  const ratings = p.ratings || {};\n  const oneStar = Number(ratings['1'] || 0);\n  const twoStar = Number(ratings['2'] || 0);\n  const totalReviews = Object.values(ratings).reduce((acc, n) => acc + Number(n || 0), 0);\n  const lowStarCount = oneStar + twoStar;\n  const lowStarRatioPct = totalReviews > 0 ? Number(((lowStarCount / totalReviews) * 100).toFixed(1)) : 0;\n  const threads = Number(p.support_threads || 0);\n  const resolved = Number(p.support_threads_resolved || 0);\n  const unresolvedThreads = Math.max(0, threads - resolved);\n  const cleanName = String(p.name || p.slug || '').replace(/<[^>]+>/g, '').replace(/&#8211;|&amp;/g, '-').trim();\n\n  return {\n    slug: p.slug,\n    name: cleanName,\n    version: p.version || null,\n    activeInstalls: Number(p.active_installs || 0),\n    ratingOutOf100: Number(p.rating || 0),\n    oneStarCount: oneStar,\n    twoStarCount: twoStar,\n    lowStarRatioPct,\n    supportThreads: threads,\n    unresolvedThreads,\n    homepage: p.homepage || null,\n    reviewsRssUrl: `https://wordpress.org/support/plugin/${encodeURIComponent(p.slug)}/reviews/feed/?filter=1`,\n  };\n});\n\n// Pick top 3 plugins sorted by 1-star volume for live RSS complaint extraction\nscored.sort((a, b) => b.oneStarCount - a.oneStarCount);\nreturn scored.slice(0, 3).map((item) => ({ json: item }));"
+      },
+      "id": "af8f681c-4e29-551d-38f4-ee539d1367ef",
+      "name": "Score Plugin Churn & Build RSS URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.reviewsRssUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "User-Agent",
+              "value": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "3deecd5e-637b-2bc8-10bc-e5defe5fb052",
+      "name": "Fetch 1-Star Reviews RSS",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1160,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse 1-star WordPress.org RSS review feeds and categorize churn pain points\nconst items = $input.all();\nconst stats = $('Score Plugin Churn & Build RSS URLs').all();\nconst painRules = {\n  billing_pricing: /\\b(price|pricing|expensive|fee|billing|subscription|refund|charge|cost|greedy|paid)\\b/i,\n  bugs_breakage: /\\b(broken|bug|crash|error|fail|conflict|update|slow|fatal|timeout|doesn.?t work)\\b/i,\n  support_churn: /\\b(support|no reply|ignored|useless|worst|waste|uninstall|switch|alternative)\\b/i,\n};\n\nconst out = [];\nfor (let i = 0; i < items.length; i++) {\n  const xml = String(items[i].json.data ?? items[i].json.body ?? '');\n  const meta = (stats[i] && stats[i].json) ? stats[i].json : {};\n  const matches = [...xml.matchAll(/<item>([\\s\\S]*?)<\\/item>/g)].slice(0, 5);\n\n  for (const m of matches) {\n    const block = m[1];\n    const getTag = (tag) => {\n      const hit = block.match(new RegExp(`<${tag}[^>]*>([\\\\s\\\\S]*?)<\\\\/${tag}>`, 'i'));\n      return hit ? hit[1].replace(/<!\\[CDATA\\[|\\]\\]>/g, '').replace(/<[^>]+>/g, ' ').replace(/\\s+/g, ' ').trim() : '';\n    };\n    const title = getTag('title');\n    const link = getTag('link');\n    const pubDate = getTag('pubDate');\n    const desc = getTag('description');\n    const combined = `${title} ${desc}`;\n    const painCategories = Object.entries(painRules)\n      .filter(([, rx]) => rx.test(combined))\n      .map(([k]) => k);\n\n    out.push({\n      json: {\n        pluginSlug: meta.slug || null,\n        pluginName: meta.name || null,\n        activeInstalls: meta.activeInstalls ?? null,\n        oneStarCount: meta.oneStarCount ?? null,\n        unresolvedThreads: meta.unresolvedThreads ?? null,\n        reviewTitle: title,\n        pubDate,\n        painCategories,\n        excerpt: desc.slice(0, 260),\n        reviewUrl: link,\n        agentSummary: `[${meta.slug}] 1-star (${painCategories.join(',') || 'general'}): ${title}`,\n      },\n    });\n  }\n}\n\nreturn out.length ? out : [{ json: { status: 'no_1star_rss_items_parsed' } }];"
+      },
+      "id": "ecb91eee-cc11-161d-9f2c-48fffb283e70",
+      "name": "Classify 1-Star Pain Signals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        340
+      ]
+    }
+  ],
+  "connections": {
+    "Test Workflow Manually": {
+      "main": [
+        [
+          {
+            "node": "Configure Plugin Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configure Plugin Search",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configure Plugin Search": {
+      "main": [
+        [
+          {
+            "node": "Fetch WordPress Plugins API",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch WordPress Plugins API": {
+      "main": [
+        [
+          {
+            "node": "Score Plugin Churn & Build RSS URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Score Plugin Churn & Build RSS URLs": {
+      "main": [
+        [
+          {
+            "node": "Fetch 1-Star Reviews RSS",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch 1-Star Reviews RSS": {
+      "main": [
+        [
+          {
+            "node": "Classify 1-Star Pain Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b2b-market-intel-wp-churn"
+  },
+  "tags": [
+    {
+      "name": "woocommerce"
+    },
+    {
+      "name": "wordpress"
+    },
+    {
+      "name": "market-research"
+    }
+  ]
+}

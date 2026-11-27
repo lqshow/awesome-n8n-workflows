@@ -1,0 +1,244 @@
+{
+  "name": "Open-VSX Cursor & Windsurf Extension Bug Spy (Zero-Key)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Open-VSX / Cursor / Windsurf Extension Bug & Install Spy (Zero-Key)\n\nQueries the public **Eclipse Open-VSX REST API** (`open-vsx.org/api/`) for top AI/MCP extensions powering Cursor & Windsurf, then pulls `<= 3-star` developer bug & UX complaints.\n\n### Optional Cross-Store (VS Code + Open-VSX) Scale Integrations (MIT)\n- **Hosted Skill:** https://www.agensi.io/skills/vs-code-cursor-extension-install-bug-spy\n- **Cloud Batch ($5/mo free tier):** https://apify.com/ttyan0111/vscode-cursor-extension-spy\n- **STDIO MCP Server:** `npx -y github:truonggiang0111/b2b-market-intel-mcp`",
+        "height": 300,
+        "width": 620,
+        "color": 4
+      },
+      "id": "53615d8f-a269-1dc0-63cf-2204b8ae4d61",
+      "name": "Workflow Guide & Attribution",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        100,
+        -140
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "61c19884-aa0d-3b0d-ef2d-6605cb29e418",
+      "name": "Test Workflow Manually",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        120,
+        260
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 24
+            }
+          ]
+        }
+      },
+      "id": "2a48d931-11ac-4ffe-8fa0-e626c6561eda",
+      "name": "Daily Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        120,
+        440
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Configure Open-VSX search query (zero API keys required)\nconst query = 'mcp';\nconst size = 5;\nconst requestUrl = `https://open-vsx.org/api/-/search?query=${encodeURIComponent(query)}&size=${size}&sortBy=downloadCount&sortOrder=desc`;\nreturn [{ json: { query, size, requestUrl } }];"
+      },
+      "id": "00a6426e-f19f-b5ad-217b-0ba7b3fd23f2",
+      "name": "Configure Open-VSX Query",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        380,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.requestUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-b2b-market-intel/1.0"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "23234c28-2d7e-79be-47dd-5b938f532340",
+      "name": "Search Open-VSX Extensions",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        640,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract top extensions from Open-VSX search & prepare review endpoints\nconst payload = $input.first().json || {};\nconst exts = Array.isArray(payload.extensions) ? payload.extensions : [];\n\nreturn exts.slice(0, 5).map((e) => ({\n  json: {\n    extensionId: `${e.namespace}.${e.name}`,\n    namespace: e.namespace,\n    name: e.name,\n    displayName: e.displayName || e.name,\n    downloadCount: Number(e.downloadCount || 0),\n    averageRating: e.averageRating ?? null,\n    reviewCount: Number(e.reviewCount || 0),\n    homepage: e.homepage || null,\n    repository: e.repository || null,\n    reviewsUrl: `https://open-vsx.org/api/${encodeURIComponent(e.namespace)}/${encodeURIComponent(e.name)}/reviews`,\n  },\n}));"
+      },
+      "id": "2e75c546-d931-1bb7-00c8-1230f2e41538",
+      "name": "Extract Extensions & Review URLs",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $json.reviewsUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/json"
+            },
+            {
+              "name": "User-Agent",
+              "value": "n8n-b2b-market-intel/1.0"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 15000
+        }
+      },
+      "id": "7996c96b-02d7-4c9b-cee8-c0172a00a8bb",
+      "name": "Fetch Extension Reviews",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1160,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Filter <= 3-star Open-VSX developer bug & UX reviews\nconst revResponses = $input.all();\nconst extMeta = $('Extract Extensions & Review URLs').all();\nconst out = [];\n\nfor (let i = 0; i < revResponses.length; i++) {\n  const data = revResponses[i].json || {};\n  const meta = (extMeta[i] && extMeta[i].json) ? extMeta[i].json : {};\n  const reviews = Array.isArray(data.reviews) ? data.reviews : [];\n  const lowReviews = reviews.filter((r) => Number(r.rating || 5) <= 3);\n\n  out.push({\n    json: {\n      extensionId: meta.extensionId,\n      displayName: meta.displayName,\n      downloadCount: meta.downloadCount,\n      averageRating: meta.averageRating,\n      totalReviews: meta.reviewCount,\n      lowStarReviewCount: lowReviews.length,\n      repository: meta.repository,\n      recentLowReviews: lowReviews.slice(0, 5).map((r) => ({\n        rating: r.rating,\n        user: (r.user && r.user.loginName) || null,\n        comment: String(r.comment || '').slice(0, 240),\n        timestamp: r.timestamp || null,\n      })),\n      agentSummary: `${meta.extensionId}: ${meta.downloadCount.toLocaleString('en-US')} installs, ${lowReviews.length} <=3-star reviews`,\n    },\n  });\n}\n\nreturn out.length ? out : [{ json: { status: 'no_extensions_found' } }];"
+      },
+      "id": "372eb00d-37f9-2ff1-e4d7-e724fe36240a",
+      "name": "Filter Low-Star Bug Signals",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1420,
+        340
+      ]
+    }
+  ],
+  "connections": {
+    "Test Workflow Manually": {
+      "main": [
+        [
+          {
+            "node": "Configure Open-VSX Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Daily Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Configure Open-VSX Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Configure Open-VSX Query": {
+      "main": [
+        [
+          {
+            "node": "Search Open-VSX Extensions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search Open-VSX Extensions": {
+      "main": [
+        [
+          {
+            "node": "Extract Extensions & Review URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Extensions & Review URLs": {
+      "main": [
+        [
+          {
+            "node": "Fetch Extension Reviews",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Extension Reviews": {
+      "main": [
+        [
+          {
+            "node": "Filter Low-Star Bug Signals",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "b2b-market-intel-openvsx-spy"
+  },
+  "tags": [
+    {
+      "name": "openvsx"
+    },
+    {
+      "name": "cursor"
+    },
+    {
+      "name": "zero-key"
+    }
+  ]
+}
